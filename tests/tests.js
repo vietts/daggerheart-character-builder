@@ -49,6 +49,7 @@ const {
 const {
   derivedStats,
   effectBonuses,
+  effectExperienceBonuses,
   evasionTotal,
   hitPointTotal,
   stressTotal,
@@ -690,6 +691,34 @@ group("An ancestry feature that grants a stat actually grants it");
   // Nimble is Simiah's SECOND feature, unlike every other stat feature in the book.
   const simiah = derivedStats(statChar(heritage("core_ancestry_simiah", "Nimble")), FX_DB);
   eq("Simiah's Nimble is +1 Evasion", simiah.evasion.total, 10);
+}
+
+group("A permanent Experience bonus reaches the level up picker, not just the sheet");
+{
+  // Purposeful Design is the one effect that raises a named Experience rather than a stat, so
+  // it's the one the replay can't know about: expBonus only counts the +1s taken as
+  // advancements. The picker used to build its numbers from the replay alone, which offered a
+  // Clank an Experience at +2 while the sheet showed it at +3.
+  const clank = (answer) => statChar({
+    ...heritage("core_ancestry_clank", "Purposeful Design"),
+    ...(answer ? { effectChoices: { "core_ancestry_clank:Purposeful Design": answer } } : {}),
+  });
+
+  eq("unanswered, it grants nothing", effectExperienceBonuses(clank(null), FX_DB), {});
+
+  const answered = clank({ optionId: "one", experienceIds: ["e1"] });
+  eq("answered, the chosen Experience carries +1", effectExperienceBonuses(answered, FX_DB), { e1: 1 });
+  eq("and the one it didn't choose carries nothing",
+    effectExperienceBonuses(clank({ optionId: "one", experienceIds: ["e2"] }), FX_DB).e1 || 0, 0);
+
+  // The arithmetic the picker does, against the number the sheet shows for the same Experience.
+  const bonuses = effectExperienceBonuses(answered, FX_DB);
+  const asPicker = (id) => experiencesAtLevel(answered, answered.level, stateAtLevel(answered, answered.level + 1).expBonus)
+    .map((exp) => ({ ...exp, modifier: exp.modifier + (bonuses[exp.id] || 0) }))
+    .find((e) => e.id === id).modifier;
+  const asSheet = (id) => derivedStats(answered, FX_DB).experiences.find((e) => e.id === id).total;
+  eq("the picker and the sheet agree on the boosted Experience", asPicker("e1"), asSheet("e1"));
+  eq("and on the one that wasn't boosted", asPicker("e2"), asSheet("e2"));
 }
 
 group("A subclass tier implies the tiers below it, and their bonuses stack");

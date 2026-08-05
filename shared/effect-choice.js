@@ -72,7 +72,7 @@ function renderExperiences(container, key, choice, answer, experiences, onChange
   list.className = "option-list";
   for (const exp of experiences) {
     const picked = answer.experienceIds.includes(exp.id);
-    const name = exp.pending ? "(the new Experience from this level)" : (exp.name || "(unnamed)");
+    const name = exp.name?.trim() || (exp.pending ? "(the new Experience from this level)" : "(unnamed)");
     const label = `${name}  +${exp.modifier ?? 2}`;
     // Picking exactly one is a radio: with checkboxes, changing your mind means unticking
     // first, because the other rows go disabled as soon as the quota is full.

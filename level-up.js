@@ -24,7 +24,7 @@ import {
   unresolvedProblems,
   validateEntry,
 } from "./shared/history.js";
-import { effectBonuses, hitPointTotal, stressTotal } from "./shared/derived-stats.js";
+import { effectBonuses, effectExperienceBonuses, hitPointTotal, stressTotal } from "./shared/derived-stats.js";
 import { blankAnswer, choiceFor } from "./shared/effects.js";
 import { renderEffectChoice } from "./shared/effect-choice.js";
 import { escapeHtml } from "./shared/escape.js";
@@ -46,6 +46,10 @@ let mandatoryCardId = null;
 let grantedCardIds = [];
 // Answers to the "choose two of the following" cards taken on this screen, keyed by card id.
 let pendingChoices = {};
+// The name for the Experience a tier achievement hands over at this level. Held here rather
+// than written straight onto the character because at levels 2/5/8 the Experience doesn't
+// exist until confirm; when a past level is being edited it's seeded from the real one.
+let achievementExperienceName = "";
 let exchange = null; // optional { outCardId, inCardId }: the swap allowed on every level up
 
 // With ?level=N the screen edits a level already taken instead of gaining a new one: same
@@ -171,9 +175,15 @@ function pendingExperienceId(newLevel) {
 }
 
 function experiencesForPicking(newLevel) {
-  const list = experiencesAtLevel(character, newLevel, context.expBonus);
+  // experiencesAtLevel replays the +1s taken as advancements, which is only half the story:
+  // a permanent bonus from effects.js (Clank's Purposeful Design) never went through the
+  // replay, so without this the picker offers an Experience at a lower number than the sheet
+  // shows for it.
+  const effectBonus = effectExperienceBonuses(character, db);
+  const list = experiencesAtLevel(character, newLevel, context.expBonus)
+    .map((exp) => ({ ...exp, modifier: exp.modifier + (effectBonus[exp.id] || 0) }));
   if (isLevelAchievement(newLevel) && !list.some((e) => e.sinceLevel === newLevel)) {
-    list.push({ id: pendingExperienceId(newLevel), name: "", modifier: 2, sinceLevel: newLevel, pending: true });
+    list.push({ id: pendingExperienceId(newLevel), name: achievementExperienceName, modifier: 2, sinceLevel: newLevel, pending: true });
   }
   return list;
 }
@@ -231,6 +241,7 @@ function render() {
     box.textContent = `Automatic level achievement: a new Experience at +2 and +1 permanent Proficiency.` +
       (newLevel >= 5 ? " Marks on traits you've already increased are cleared: you can raise them again." : "");
     main.appendChild(box);
+    renderAchievementExperienceName(main);
   }
 
   renderAdvancementGrid(main, newLevel);
@@ -241,6 +252,28 @@ function render() {
   renderCardChoices(main, newLevel);
 
   renderConfirmBar(main, newLevel);
+}
+
+// The Experience the achievement grants used to arrive unnamed and stay that way: the screen
+// announced it, the picker offered it as "(the new Experience from this level)", and nothing
+// ever asked what it was. Naming it belongs here, next to the sentence that says you've got
+// one — not in the picker, which is about raising Experiences rather than gaining them.
+//
+// Left blank it's still saved unnamed, exactly as before. Requiring a name here would block
+// the level up for a player who hasn't thought of one yet, which is the trap the creation
+// wizard already sidestepped by only validating its own starting pair.
+function renderAchievementExperienceName(main) {
+  const row = document.createElement("div");
+  row.className = "field-row";
+  row.innerHTML = `<label>Name the new Experience <input type="text" value="${escapeHtml(achievementExperienceName)}" placeholder="e.g. Assassin of the Sapphire Syndicate" /></label>`;
+  const input = row.querySelector("input");
+  input.addEventListener("input", (e) => {
+    achievementExperienceName = e.target.value;
+    // Deliberately no re-render: it would take the caret with it on every keystroke. The
+    // pickers below read this name, so they're refreshed when the field is left instead.
+  });
+  input.addEventListener("change", render);
+  main.appendChild(row);
 }
 
 function renderAdvancementGrid(main, newLevel) {
@@ -397,7 +430,7 @@ function renderExperienceSubPicker(main, pick, ordinal, newLevel) {
   for (const exp of experiencesForPicking(newLevel)) {
     const isPicked = pick.experienceIds.includes(exp.id);
     const disabled = !isPicked && pick.experienceIds.length >= 2;
-    const name = exp.pending ? "(the new Experience from this level)" : (exp.name || "(unnamed)");
+    const name = exp.name?.trim() || (exp.pending ? "(the new Experience from this level)" : "(unnamed)");
     const row = document.createElement("label");
     row.className = "option-row";
     row.innerHTML = `<input type="checkbox" ${isPicked ? "checked" : ""} ${disabled ? "disabled" : ""}/> ${escapeHtml(name)} <span class="exp-mod">+${escapeHtml(exp.modifier)}</span>`;
@@ -750,10 +783,20 @@ function writeEntry(target, newLevel) {
   return target;
 }
 
+// A name isn't a recorded choice, so it never enters the level entry the replay reads. On an
+// edit the Experience already exists, so the name goes straight onto it — after writeEntry,
+// whose recomputeCharacter only ever rewrites modifiers.
+function commitAchievementExperienceName(level) {
+  if (!isLevelAchievement(level)) return;
+  const exp = character.experiences?.find((e) => e.id === pendingExperienceId(level));
+  if (exp) exp.name = achievementExperienceName.trim();
+}
+
 function commitLevelEdit(newLevel) {
   saveUndoSnapshot();
   writeEntry(character, newLevel);
   commitCardChoices();
+  commitAchievementExperienceName(newLevel);
   character.updatedAt = new Date().toISOString();
   persistCharacter();
   location.href = `characters.html?open=${character.id}&history=1`;
@@ -787,7 +830,7 @@ function applyLevelUp(newLevel) {
   if (isLevelAchievement(newLevel)) {
     character.experiences.push({
       id: pendingExperienceId(newLevel),
-      name: "",
+      name: achievementExperienceName.trim(),
       baseModifier: 2,
       modifier: 2,
       sinceLevel: newLevel,
@@ -826,6 +869,7 @@ function applyLevelUp(newLevel) {
   grantedCardIds = [];
   exchange = null;
   pendingChoices = {};
+  achievementExperienceName = "";
 
   render();
 }
@@ -843,6 +887,8 @@ function loadPicksFrom(entry) {
   grantedCardIds = [...(entry.grantedCardIds || [])];
   exchange = entry.exchange ? { ...entry.exchange } : null;
   pendingChoices = {};
+  achievementExperienceName = character.experiences
+    ?.find((e) => e.id === pendingExperienceId(entry.level))?.name || "";
 }
 
 async function init() {

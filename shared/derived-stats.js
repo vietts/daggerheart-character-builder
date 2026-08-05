@@ -150,6 +150,19 @@ export function effectBonuses(ch, db) {
   return totals;
 }
 
+/**
+ * The permanent per-Experience bonuses a character has from effects (Clank's Purposeful
+ * Design, Vitality's kin), keyed by Experience id. These sit outside effectBonuses because
+ * they don't land on a stat: they land on one named Experience the player chose.
+ *
+ * The level up screen's Experience picker needs them for the same reason the sheet does —
+ * it shows each Experience's current modifier, and an Experience carrying one of these is
+ * higher than the replay alone believes.
+ */
+export function effectExperienceBonuses(ch, db) {
+  return gather(ch, db).experienceBonus;
+}
+
 // ---------- the full picture ----------
 
 /**
