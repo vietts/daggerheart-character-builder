@@ -166,6 +166,24 @@ export function recomputeCharacter(ch) {
   return ch;
 }
 
+// Records one level's choices — replacing that level's entry if it already has one — and
+// re-derives everything from the result. The level up screen writes every entry through here
+// so that what an edit does to a character is defined in the same file as the replay that
+// reads it back.
+//
+// Note what it does NOT touch: the baseline. An exchange is applied by applyEntry above and
+// nowhere else. Writing the swapped-in card into creationDomainCardIds as well used to look
+// harmless — the replay produced the same collection either way — but it made the baseline
+// claim the character had started with a card they only swapped in later, and validateEntry
+// reads that baseline as "what you owned before this level". The result was a legal swap
+// reported as illegal, with no edit that could clear it. See the repair in ensureLevelFields.
+export function writeLevelEntry(ch, entry) {
+  if (!Array.isArray(ch.levelUps)) ch.levelUps = [];
+  const at = ch.levelUps.findIndex((e) => e.level === entry.level);
+  if (at >= 0) ch.levelUps[at] = entry; else ch.levelUps.push(entry);
+  return recomputeCharacter(ch);
+}
+
 // Levels whose choices are recorded, oldest first.
 export function recordedLevels(ch) {
   return entriesFor(ch).map((e) => e.level);

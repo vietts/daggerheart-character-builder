@@ -23,6 +23,7 @@ const {
   SUBCLASS_TIER_LABELS,
   SUBCLASS_TIER_ORDER,
   TIER_CARD_CAP,
+  advancementCredits,
   availableOptionKeys,
   blankSlotsUsed,
   ensureLevelFields,
@@ -45,10 +46,13 @@ const {
   unresolvedProblems,
   validateEntry,
   validateLevelUps,
+  writeLevelEntry,
 } = await import(`../shared/history.js${RUN}`);
 const {
+  TRAIT_KEYS,
   derivedStats,
   effectBonuses,
+  effectExperienceBonuses,
   evasionTotal,
   hitPointTotal,
   stressTotal,
@@ -88,6 +92,9 @@ const DB = {
   classes: [{ id: "cls", domains: ["VALOR", "BLADE"], startingHitPoints: 7, startingEvasion: 9 }],
   domainCards: [
     { id: "c1", level: 1, domain: "VALOR", name: { "en-US": "One" } },
+    // Two more level 1 cards, so a starting card has something legal to be exchanged for.
+    { id: "c1b", level: 1, domain: "BLADE", name: { "en-US": "One again" } },
+    { id: "c1c", level: 1, domain: "BLADE", name: { "en-US": "One once more" } },
     { id: "c2", level: 2, domain: "VALOR", name: { "en-US": "Two" } },
     { id: "c3", level: 3, domain: "BLADE", name: { "en-US": "Three" } },
     { id: "c4", level: 4, domain: "VALOR", name: { "en-US": "Four" } },
@@ -405,6 +412,96 @@ group("An exchange replays in place");
   check("the card taken is there", modern.domainCardIds.includes("off"));
 }
 
+// The exchange is the least-exercised part of a level up — it's optional, it's the only choice
+// that REMOVES something, and the card it takes away can be one the character started with,
+// which is the one card the replay doesn't own. These go through writeLevelEntry, the same
+// function the level up screen writes every entry with, rather than reaching into levelUps.
+
+group("Exchanging a card the character STARTED with");
+{
+  const twoPicks = [{ key: "evasion", slotTier: 2 }, { key: "stress", slotTier: 2 }];
+  const ch = newCharacter();
+  ch.level = 2;
+  writeLevelEntry(ch, entry(2, twoPicks, "c2", { outCardId: "c1", inCardId: "c1b" }));
+
+  eq("the collection has the swap applied", ch.domainCardIds, ["c1b", "c2"]);
+  eq("the starting cards still say what was started with", ch.creationDomainCardIds, ["c1"]);
+  // The bug this pins down: the swap used to be written into the starting cards as well, and
+  // the validation reads those as "what you owned before this level" — so a legal swap was
+  // reported as "the card being given up isn't in the collection at this level" on every load,
+  // and no edit could clear it, because re-saving the level wrote the same list back.
+  eq("and the level is not flagged", validateLevelUps(ch, DB), []);
+
+  writeLevelEntry(ch, entry(2, twoPicks, "c2", { outCardId: "c1", inCardId: "c1c" }));
+  eq("editing the level to swap for something else re-runs from the original card", ch.domainCardIds, ["c1c", "c2"]);
+  eq("still nothing flagged", validateLevelUps(ch, DB), []);
+
+  writeLevelEntry(ch, entry(2, twoPicks, "c2", null));
+  eq("dropping the swap altogether gives the starting card back", ch.domainCardIds, ["c1", "c2"]);
+  eq("and the starting cards never moved", ch.creationDomainCardIds, ["c1"]);
+}
+
+group("Exchanging a card gained on an earlier level");
+{
+  const ch = buildTo([
+    entry(2, [{ key: "evasion", slotTier: 2 }, { key: "stress", slotTier: 2 }], "c2"),
+    entry(3, [{ key: "hitPoint", slotTier: 2 }, { key: "stress", slotTier: 2 }], "c3", { outCardId: "c2", inCardId: "c1b" }),
+  ], 3);
+  eq("the card taken at level 2 is the one that leaves", ch.domainCardIds, ["c1", "c1b", "c3"]);
+  eq("nothing is flagged", validateLevelUps(ch, DB), []);
+
+  // Giving up a card the character no longer has by then IS an error, and has to stay one.
+  const errors = validateEntry(ch, entry(3, [{ key: "hitPoint", slotTier: 2 }, { key: "stress", slotTier: 2 }], "c3", { outCardId: "c7", inCardId: "c1b" }), DB);
+  has("a card that was never owned still can't be given up", errors, "isn't in the collection");
+}
+
+group("An exchange leaves the vault holding only cards still owned");
+{
+  const ch = buildTo([entry(2, [{ key: "evasion", slotTier: 2 }, { key: "stress", slotTier: 2 }], "c2")], 2);
+  ch.domainVaultIds = ["c1"];
+  recomputeCharacter(ch);
+  eq("the vaulted card is there to begin with", ch.domainVaultIds, ["c1"]);
+
+  writeLevelEntry(ch, entry(2, [{ key: "evasion", slotTier: 2 }, { key: "stress", slotTier: 2 }], "c2", { outCardId: "c1", inCardId: "c1b" }));
+  eq("swapping it away empties the vault rather than leaving a card nobody owns", ch.domainVaultIds, []);
+  eq("and the card taken is in the collection", ch.domainCardIds, ["c1b", "c2"]);
+}
+
+group("Repairing a character saved while exchanges were baked into the baseline");
+{
+  const twoPicks = [{ key: "evasion", slotTier: 2 }, { key: "stress", slotTier: 2 }];
+  const stale = newCharacter();
+  stale.level = 3;
+  stale.levelUps.push(entry(2, twoPicks, "c2", { outCardId: "c1", inCardId: "c1b" }));
+  stale.levelUps.push(entry(3, [{ key: "hitPoint", slotTier: 2 }, { key: "stress", slotTier: 2 }], "c3", { outCardId: "c1b", inCardId: "c1c" }));
+  // What the old code left on disk: the same card swapped twice, written into the starting
+  // cards both times, so the baseline ended up naming a card taken two levels later.
+  stale.creationDomainCardIds = ["c1c"];
+  delete stale.creationCardsUnbaked;
+
+  ensureLevelFields(stale);
+  recomputeCharacter(stale);
+  eq("the chain unwinds to the card actually started with", stale.creationDomainCardIds, ["c1"]);
+  eq("the collection is what it always was", stale.domainCardIds, ["c1c", "c2", "c3"]);
+  eq("and the flags clear with no edit from the player", validateLevelUps(stale, DB), []);
+
+  // Repairing a character whose baseline is already honest must not un-swap it a second time.
+  delete stale.creationCardsUnbaked;
+  ensureLevelFields(stale);
+  eq("running the repair again changes nothing", stale.creationDomainCardIds, ["c1"]);
+}
+
+group("Writing a level entry replaces that level rather than adding another");
+{
+  const ch = buildTo([entry(2, [{ key: "evasion", slotTier: 2 }, { key: "stress", slotTier: 2 }], "c2")], 2);
+  ch.levelUps[0].acceptedAsIs = true;
+
+  writeLevelEntry(ch, entry(2, [{ key: "hitPoint", slotTier: 2 }, { key: "stress", slotTier: 2 }], "c2"));
+  eq("the level appears once", ch.levelUps.map((e) => e.level), [2]);
+  eq("the new choices are the ones that count", [ch.evasionBonus, ch.hitPointSlotsBonus], [0, 1]);
+  check("and redeclaring a level withdraws 'keep as is'", !ch.levelUps[0].acceptedAsIs);
+}
+
 group("The same option marked twice in one level applies twice");
 {
   const ch = newCharacter();
@@ -586,6 +683,55 @@ group("Derived stats are worked out in one place");
   eq("a zero bonus isn't listed at all", derivedStats(statChar(), STAT_DB).evasion.parts.length, 1);
 }
 
+group("A breakdown names the level that granted each point");
+{
+  // "Level up advancements +3" is true and useless: it can't be checked against anything the
+  // player remembers doing. The levels come from the recorded entries, so a breakdown can name
+  // them — and a character built above level 1 keeps the generic part for the levels that were
+  // never recorded, rather than having one invented for it.
+  const ch = statChar();
+  record(ch, 2, [{ key: "evasion", slotTier: 2 }, { key: "experience", slotTier: 2, experienceIds: ["e1", "e2"] }], "c2");
+  record(ch, 3, [{ key: "traits", slotTier: 2, traits: ["agility", "strength"] }, { key: "hitPoint", slotTier: 2 }], "c3");
+  const s = derivedStats(ch, STAT_DB);
+  const labels = (stat) => stat.parts.map((p) => p.label);
+
+  eq("Evasion", labels(s.evasion), ["Guardian (class)", "Level 2 advancement"]);
+  eq("Hit Points", labels(s.hitPoints), ["Guardian (class)", "Level 3 advancement"]);
+  eq("a trait separates what was assigned from what was earned", labels(s.traits.agility), ["Assigned at creation", "Level 3 advancement"]);
+  eq("a trait nothing has touched still explains itself", labels(s.traits.finesse), ["Assigned at creation"]);
+  // Proficiency comes from the tier achievement at 2, 5 and 8 as well as from the advancement
+  // option, and the breakdown has to tell the two apart.
+  eq("Proficiency", labels(s.proficiency), ["Base", "Level 2 achievement"]);
+  eq("the parts still add up to the total", s.proficiency.parts.reduce((n, p) => n + p.value, 0), s.proficiency.total);
+
+  const raised = s.experiences.find((e) => e.id === "e1");
+  eq("an Experience raised by an advancement says which level did it", labels(raised), ["Base", "Level 2 advancement"]);
+  // It used to report the modifier itself as a part, which left exactly one part — and the
+  // sheet only offers the "?" from two up, so nothing explained why the Experience wasn't +2.
+  check("so it has the two parts the sheet needs to offer its '?'", raised.parts.length > 1);
+  eq("an Experience nothing has raised keeps a single part", labels(s.experiences.find((e) => e.id === "exp_lv2")), ["Base"]);
+}
+
+group("Advancement credits reconcile with the replay");
+{
+  // The credits are attributed by a second walk over the recorded entries, so the risk is that
+  // it drifts from the replay that produces the numbers. Nothing here checks a label: it checks
+  // that every credit sums to exactly the bonus the replay arrived at.
+  const ch = newCharacter();
+  for (const step of SCRIPT) record(ch, step.level, step.picks, step.card, step.exchange);
+  const credits = advancementCredits(ch);
+  const sum = (list) => (list || []).reduce((n, c) => n + c.value, 0);
+
+  eq("hit point slots", sum(credits.hitPoint), ch.hitPointSlotsBonus - ch.baseline.hitPointSlotsBonus);
+  eq("stress slots", sum(credits.stress), ch.stressSlotsBonus - ch.baseline.stressSlotsBonus);
+  eq("evasion", sum(credits.evasion), ch.evasionBonus - ch.baseline.evasionBonus);
+  eq("proficiency, tier achievements included", sum(credits.proficiency), ch.proficiency - ch.baseline.proficiency);
+  eq("every trait", TRAIT_KEYS.map((k) => sum(credits.traits[k])),
+    TRAIT_KEYS.map((k) => ch.traits[k] - ch.baseline.traits[k]));
+  eq("every Experience", ch.experiences.map((e) => sum(credits.experiences[e.id])),
+    ch.experiences.map((e) => e.modifier - e.baseModifier));
+}
+
 group("Armor Score, thresholds, and the unarmored rule");
 {
   const armored = derivedStats(statChar({ level: 3, equipment: { armorId: "gambeson" } }), STAT_DB);
@@ -651,6 +797,7 @@ const FX_DB = {
     { id: "sub", spellcastTrait: "KNOWLEDGE" },
   ],
   ancestries: [
+    { id: "core_ancestry_clank", name: { "en-US": "Clank" }, features: [{ name: { "en-US": "Purposeful Design" } }] },
     { id: "core_ancestry_giant", name: { "en-US": "Giant" }, features: [{ name: { "en-US": "Endurance" } }, { name: { "en-US": "Reach" } }] },
     { id: "core_ancestry_simiah", name: { "en-US": "Simiah" }, features: [{ name: { "en-US": "Natural Climber" } }, { name: { "en-US": "Nimble" } }] },
   ],
@@ -690,6 +837,53 @@ group("An ancestry feature that grants a stat actually grants it");
   // Nimble is Simiah's SECOND feature, unlike every other stat feature in the book.
   const simiah = derivedStats(statChar(heritage("core_ancestry_simiah", "Nimble")), FX_DB);
   eq("Simiah's Nimble is +1 Evasion", simiah.evasion.total, 10);
+}
+
+group("A permanent Experience bonus reaches the level up picker, not just the sheet");
+{
+  // Purposeful Design is the one effect that raises a named Experience rather than a stat, so
+  // it's the one the replay can't know about: expBonus only counts the +1s taken as
+  // advancements. The picker used to build its numbers from the replay alone, which offered a
+  // Clank an Experience at +2 while the sheet showed it at +3.
+  const clank = (answer) => statChar({
+    ...heritage("core_ancestry_clank", "Purposeful Design"),
+    ...(answer ? { effectChoices: { "core_ancestry_clank:Purposeful Design": answer } } : {}),
+  });
+
+  eq("unanswered, it grants nothing", effectExperienceBonuses(clank(null), FX_DB), {});
+
+  const answered = clank({ optionId: "one", experienceIds: ["e1"] });
+  eq("answered, the chosen Experience carries +1", effectExperienceBonuses(answered, FX_DB), { e1: 1 });
+  eq("and the one it didn't choose carries nothing",
+    effectExperienceBonuses(clank({ optionId: "one", experienceIds: ["e2"] }), FX_DB).e1 || 0, 0);
+
+  // The arithmetic the picker does, against the number the sheet shows for the same Experience.
+  const bonuses = effectExperienceBonuses(answered, FX_DB);
+  const asPicker = (id) => experiencesAtLevel(answered, answered.level, stateAtLevel(answered, answered.level + 1).expBonus)
+    .map((exp) => ({ ...exp, modifier: exp.modifier + (bonuses[exp.id] || 0) }))
+    .find((e) => e.id === id).modifier;
+  const asSheet = (id) => derivedStats(answered, FX_DB).experiences.find((e) => e.id === id).total;
+  eq("the picker and the sheet agree on the boosted Experience", asPicker("e1"), asSheet("e1"));
+  eq("and on the one that wasn't boosted", asPicker("e2"), asSheet("e2"));
+}
+
+group("An Experience breakdown names every source, and no subtotal");
+{
+  // The reported case: a Clank whose Purposeful Design bonus and a level 2 advancement both
+  // landed on the same Experience saw +4 explained as "Experience +3, Permanent bonus +1" —
+  // where the +3 was the very thing being asked about, and the feature that granted the other
+  // +1 went unnamed.
+  const clank = statChar({
+    ...heritage("core_ancestry_clank", "Purposeful Design"),
+    effectChoices: { "core_ancestry_clank:Purposeful Design": { optionId: "one", experienceIds: ["e1"] } },
+  });
+  record(clank, 2, [{ key: "experience", slotTier: 2, experienceIds: ["e1", "e2"] }, { key: "evasion", slotTier: 2 }], "c2");
+
+  const e1 = derivedStats(clank, FX_DB).experiences.find((e) => e.id === "e1");
+  eq("the total is unchanged", e1.total, 4);
+  eq("and every part of it is a real source",
+    e1.parts.map((p) => `${p.label} ${p.value}`),
+    ["Base 2", "Level 2 advancement 1", "Clank — Purposeful Design 1"]);
 }
 
 group("A subclass tier implies the tiers below it, and their bonuses stack");

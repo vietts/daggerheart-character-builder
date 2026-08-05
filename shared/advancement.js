@@ -177,6 +177,73 @@ function captureBaseline(ch) {
   };
 }
 
+// A one-off repair, for characters saved while the level up screen wrote an exchange into the
+// starting cards as well as into the level entry. The collection came out right either way —
+// the replay applies the swap to whichever list it finds it in — but the baseline was left
+// claiming the character had started with a card they swapped in later, and validateEntry
+// reads the baseline as "what you owned before this level". So a legal swap of a STARTING card
+// reported "the card being given up isn't in the collection at this level" on every load, and
+// no edit could clear it: re-saving the level wrote the same baked list back.
+//
+// Newest level first, so a card swapped more than once unwinds in the reverse of the order it
+// was applied. Only a swap that looks baked is touched — the taken card sitting in the starting
+// list where the given-up card is absent — which makes this a no-op on repaired characters and
+// on every exchange written since.
+function unbakeExchanges(ch) {
+  if (ch.creationCardsUnbaked) return;
+  for (const entry of [...ch.levelUps].sort((a, b) => b.level - a.level)) {
+    const swap = entry.exchange;
+    if (!swap?.outCardId || !swap.inCardId) continue;
+    const at = ch.creationDomainCardIds.indexOf(swap.inCardId);
+    if (at >= 0 && !ch.creationDomainCardIds.includes(swap.outCardId)) {
+      ch.creationDomainCardIds[at] = swap.outCardId;
+    }
+  }
+  ch.creationCardsUnbaked = true;
+}
+
+// Which level granted each point of a level-dependent stat, so a "?" breakdown can say
+// "Level 3 advancement +1" rather than lumping an entire career into "Level up advancements".
+//
+// This walks the recorded entries the same way the replay in shared/history.js does, but it
+// only attributes: it derives no stat of its own, so the two can't disagree about a number.
+// (The suite pins that down — every credit here has to sum to the bonus the replay produced.)
+// It lives here rather than beside the replay because the breakdowns are built in
+// derived-stats.js, which the replay imports: the attribution has to sit below both.
+//
+// Only recorded levels can be credited. A character baselined above level 1 carries bonuses
+// from levels nobody wrote down, and those stay unattributed on purpose — the breakdown
+// reports the remainder as one generic part rather than inventing a level for it.
+export function advancementCredits(ch) {
+  const credits = { hitPoint: [], stress: [], evasion: [], proficiency: [], traits: {}, experiences: {} };
+  const bump = (list, level, source) => {
+    const at = list.find((c) => c.level === level && c.source === source);
+    if (at) at.value += 1; else list.push({ level, source, value: 1 });
+  };
+  const into = (map, key) => (map[key] ||= []);
+
+  const byLevel = new Map((ch.levelUps || []).map((e) => [e.level, e]));
+  for (let level = (ch.baselineLevel ?? 1) + 1; level <= ch.level; level++) {
+    // Step One on the sheet, before any advancement is chosen: the tier achievement.
+    if (isLevelAchievement(level)) bump(credits.proficiency, level, "achievement");
+    for (const pick of byLevel.get(level)?.picks || []) {
+      switch (pick.key) {
+        case "traits":
+          for (const key of pick.traits || []) bump(into(credits.traits, key), level, "advancement");
+          break;
+        case "experience":
+          for (const id of pick.experienceIds || []) bump(into(credits.experiences, id), level, "advancement");
+          break;
+        case "hitPoint": bump(credits.hitPoint, level, "advancement"); break;
+        case "stress": bump(credits.stress, level, "advancement"); break;
+        case "evasion": bump(credits.evasion, level, "advancement"); break;
+        case "proficiency": bump(credits.proficiency, level, "advancement"); break;
+      }
+    }
+  }
+  return credits;
+}
+
 // Characters saved before levels were introduced don't have these fields: this adds
 // them without touching the rest, so they stay valid as "level 1" the moment they're opened.
 export function ensureLevelFields(ch) {
@@ -205,6 +272,7 @@ export function ensureLevelFields(ch) {
   if (!Array.isArray(ch.levelUps)) ch.levelUps = [];
   if (ch.baselineLevel === undefined) ch.baselineLevel = ch.level;
   if (!ch.baseline) ch.baseline = captureBaseline(ch);
+  unbakeExchanges(ch);
 
   // Experiences need stable ids: the level 2/5/8 achievements append new ones, which shifts
   // every index after them. sinceLevel records when each became available, so a level up

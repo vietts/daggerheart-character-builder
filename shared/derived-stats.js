@@ -16,6 +16,7 @@ import {
   MAX_ARMOR_SCORE,
   MAX_HIT_POINT_SLOTS,
   MAX_STRESS_SLOTS,
+  advancementCredits,
   damageThresholds,
 } from "./advancement.js";
 import { EFFECT_STAT_KEYS, collectEffects, effectValue, loadoutDomainCounts } from "./effects.js";
@@ -107,7 +108,11 @@ function gather(ch, db) {
     else contributions.push(entry);
   }
 
+  // Two shapes of the same thing: the totals, for callers doing arithmetic, and the parts they
+  // were built from, so the breakdown can name the feature that granted each one rather than
+  // reporting the sum as an anonymous "permanent bonus".
   const experienceBonus = {};
+  const experienceParts = {};
   for (const entry of active) {
     const answer = ch.effectChoices?.[entry.key];
     if (!entry.effect.choice || entry.effect.choice.kind !== "experience" || !answer) continue;
@@ -115,10 +120,11 @@ function gather(ch, db) {
     if (!option) continue;
     for (const expId of (answer.experienceIds || []).slice(0, option.pick)) {
       experienceBonus[expId] = (experienceBonus[expId] || 0) + option.bonus;
+      (experienceParts[expId] ||= []).push({ label: entry.label, value: option.bonus });
     }
   }
 
-  return { contributions, exclusions, experienceBonus, ctx };
+  return { contributions, exclusions, experienceBonus, experienceParts, ctx };
 }
 
 // Contributions to one stat, as breakdown parts. Weapon features that boost attack rolls are
@@ -150,6 +156,19 @@ export function effectBonuses(ch, db) {
   return totals;
 }
 
+/**
+ * The permanent per-Experience bonuses a character has from effects (Clank's Purposeful
+ * Design, Vitality's kin), keyed by Experience id. These sit outside effectBonuses because
+ * they don't land on a stat: they land on one named Experience the player chose.
+ *
+ * The level up screen's Experience picker needs them for the same reason the sheet does —
+ * it shows each Experience's current modifier, and an Experience carrying one of these is
+ * higher than the replay alone believes.
+ */
+export function effectExperienceBonuses(ch, db) {
+  return gather(ch, db).experienceBonus;
+}
+
 // ---------- the full picture ----------
 
 /**
@@ -167,34 +186,35 @@ export function derivedStats(ch, db) {
     ? find(db?.weapons, ch.equipment?.secondaryWeaponId)
     : null;
 
-  const { contributions, exclusions, experienceBonus, ctx } = gather(ch, db);
+  const { contributions, exclusions, experienceParts, ctx } = gather(ch, db);
   const className = cls ? titleCase(cls.name) : "Class";
+  const credits = advancementCredits(ch);
 
-  const traits = effectiveTraits(ch, contributions, ctx);
+  const traits = effectiveTraits(ch, contributions, ctx, credits.traits);
   ctx.traits = {};
   for (const key of TRAIT_KEYS) ctx.traits[key] = traits[key].total ?? 0;
 
   return {
     traits,
     exclusions,
-    experiences: experienceStats(ch, experienceBonus),
+    experiences: experienceStats(ch, experienceParts, credits.experiences),
     // Evasion has no cap in the rules, unlike Hit Points, Stress and Armor Score.
     evasion: cls ? stat([
       { label: `${className} (class)`, value: cls.startingEvasion },
-      ...advancementPart(ch.evasionBonus),
+      ...advancementParts(ch.evasionBonus, credits.evasion),
       ...partsFor(contributions, "evasion", ctx),
     ]) : null,
     hitPoints: cls ? capped(stat([
       { label: `${className} (class)`, value: cls.startingHitPoints },
-      ...advancementPart(ch.hitPointSlotsBonus),
+      ...advancementParts(ch.hitPointSlotsBonus, credits.hitPoint),
       ...partsFor(contributions, "hitPointSlots", ctx),
     ]), MAX_HIT_POINT_SLOTS, "Hit Point slots") : null,
     stress: capped(stat([
       { label: "Base", value: BASE_STRESS_SLOTS },
-      ...advancementPart(ch.stressSlotsBonus),
+      ...advancementParts(ch.stressSlotsBonus, credits.stress),
       ...partsFor(contributions, "stressSlots", ctx),
     ]), MAX_STRESS_SLOTS, "Stress slots"),
-    proficiency: stat([{ label: "Level achievements and advancements", value: ch.proficiency }]),
+    proficiency: stat(advancementParts(ch.proficiency, credits.proficiency, "Base")),
     armorScore: armorScoreStat(armor, db, contributions, ctx),
     ...thresholdStats(ch, armor, contributions, ctx),
     primaryAttack: attackStat(primaryWeapon, traits, contributions, ctx, "primary"),
@@ -203,14 +223,28 @@ export function derivedStats(ch, db) {
   };
 }
 
-// A zero bonus is left out entirely: "Advancements +0" is noise in a breakdown.
-function advancementPart(bonus) {
-  return bonus ? [{ label: "Level up advancements", value: bonus }] : [];
+/**
+ * One part per level that raised this stat — "Level 3 advancement +1" — instead of a career's
+ * worth of picks under a single "Level up advancements". Levels come from advancementCredits(),
+ * which reads the same recorded entries the replay does.
+ *
+ * `rest` is whatever the recorded levels don't account for, and it always leads: for most stats
+ * that's the bonus a character baselined above level 1 arrived with, and for Proficiency and
+ * traits it's the starting value. Reporting it rather than dropping it is what keeps the parts
+ * adding up to the number on the tile even if the two ever disagree. A zero contributes nothing
+ * — "Advancements +0" is noise in a breakdown.
+ */
+function advancementParts(bonus, credits, restLabel = "Level up advancements") {
+  const attributed = (credits || []).filter((c) => c.value);
+  const rest = bonus - attributed.reduce((sum, c) => sum + c.value, 0);
+  const parts = rest ? [{ label: restLabel, value: rest }] : [];
+  for (const c of attributed) parts.push({ label: `Level ${c.level} ${c.source}`, value: c.value });
+  return parts;
 }
 
 // Base assignment plus advancement picks, plus whatever equipment and cards modify. Armor and
 // weapons are the usual source (Full Plate's -1 Agility, a Halberd's -1 Finesse).
-function effectiveTraits(ch, contributions, ctx) {
+function effectiveTraits(ch, contributions, ctx, traitCredits) {
   const out = {};
   for (const key of TRAIT_KEYS) {
     const base = ch.traits?.[key];
@@ -218,7 +252,10 @@ function effectiveTraits(ch, contributions, ctx) {
       out[key] = { total: null, parts: [] };
       continue;
     }
-    const parts = [{ label: "Assigned at creation, plus advancements", value: base }];
+    const parts = advancementParts(base, traitCredits?.[key], "Assigned at creation");
+    // A trait can legitimately be 0, and advancementParts drops a part worth nothing — but a
+    // tile with no parts at all loses its "?", so the creation part stays either way.
+    if (!parts.length) parts.push({ label: "Assigned at creation", value: base });
     for (const entry of contributions) {
       const traitMods = effectValue(entry.effect.traits, ctx);
       const value = traitMods?.[key];
@@ -231,12 +268,22 @@ function effectiveTraits(ch, contributions, ctx) {
 
 // Experiences get their modifier from the level up replay; a couple of features add a permanent
 // bonus on top of that, so the sheet shows the sum and the breakdown says where it came from.
-function experienceStats(ch, experienceBonus) {
+//
+// One part per source, never a subtotal. `exp.modifier` is already the base plus every
+// advancement that raised it, so reporting it as a part of its own labelled "Experience"
+// explained +4 as "Experience +3, Permanent bonus +1" — where the +3 was the very thing being
+// asked about. It also left an Experience raised only by an advancement with a single part,
+// which is one too few for statLine to offer the "?" at all, so nothing on the sheet explained
+// why it wasn't +2.
+function experienceStats(ch, experienceParts, credits) {
   return (ch.experiences || []).map((exp) => {
-    const parts = [{ label: "Experience", value: exp.modifier ?? exp.baseModifier ?? 2 }];
-    if (experienceBonus[exp.id]) {
-      parts.push({ label: "Permanent bonus", value: experienceBonus[exp.id] });
-    }
+    const base = exp.baseModifier ?? 2;
+    const total = exp.modifier ?? base;
+    const parts = [
+      { label: "Base", value: base },
+      ...advancementParts(total - base, credits?.[exp.id]),
+      ...(experienceParts[exp.id] || []),
+    ];
     return { id: exp.id, name: exp.name, ...stat(parts) };
   });
 }
