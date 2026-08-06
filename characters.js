@@ -530,7 +530,6 @@ function renderDetail() {
 
   const statsBox2 = document.createElement("div");
   statsBox2.className = "derived-box";
-  statsBox2.appendChild(statLine("Level", ch.level));
   statsBox2.appendChild(statLine("Proficiency", stats.proficiency.total, stats.proficiency));
   statsBox2.appendChild(statLine("Evasion", stats.evasion ? stats.evasion.total : "—", stats.evasion));
   statsBox2.appendChild(statLine("Hit Points", stats.hitPoints ? stats.hitPoints.total : "—", stats.hitPoints));

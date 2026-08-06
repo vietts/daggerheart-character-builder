@@ -461,6 +461,9 @@ h1, h2, h3, .btn-primary, .btn-ghost, .btn-small, .top-nav a {
 .class-tile span { font-size: 0.72rem; color: var(--text-dim); }
 .class-tile:hover { transform: translateY(-2px); }
 .class-tile.selected { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(217, 164, 65, 0.35); }
+/* La "i" sta dentro al nome, così non serve posizionarla in modo assoluto. text-transform va
+   azzerato: altrimenti eredita l'uppercase di .class-tile strong e la "i" diventa "I". */
+.class-info { text-transform: none; letter-spacing: 0; }
 
 .feature-choice-group { margin-bottom: 0.9rem; display: flex; flex-direction: column; gap: 0.4rem; }
 .feature-pick {
@@ -647,8 +650,11 @@ h1, h2, h3, .btn-primary, .btn-ghost, .btn-small, .top-nav a {
 
 /* ---------- Derivazione di una statistica ---------- */
 /* Il "?" accanto all'etichetta apre la spiegazione del numero: senza, un totale modificato
-   da equipaggiamento o sottoclasse non è verificabile da chi legge la scheda. */
-.stat-why {
+   da equipaggiamento o sottoclasse non è verificabile da chi legge la scheda. La "i" sulla
+   tessera della classe apre la sua scheda: stessa forma, perché fa la stessa cosa —
+   aggiunge contesto senza cambiare nulla. */
+.stat-why,
+.class-info {
   margin-left: 0.35rem;
   width: 1.05rem;
   height: 1.05rem;
@@ -663,7 +669,8 @@ h1, h2, h3, .btn-primary, .btn-ghost, .btn-small, .top-nav a {
   vertical-align: middle;
   transition: border-color 0.12s ease, color 0.12s ease;
 }
-.stat-why:hover { border-color: var(--accent); color: var(--accent); }
+.stat-why:hover,
+.class-info:hover { border-color: var(--accent); color: var(--accent); }
 
 .popover-overlay {
   display: none;
@@ -720,3 +727,27 @@ h1, h2, h3, .btn-primary, .btn-ghost, .btn-small, .top-nav a {
   cursor: pointer;
 }
 .popover-close:hover { color: var(--accent); }
+
+/* ---------- Scheda di dettaglio di una classe ---------- */
+
+.class-detail { display: flex; flex-direction: column; gap: 0.9rem; }
+/* Dentro alla modale i margini della griglia si sommerebbero al gap del contenitore. */
+.class-detail-stats { margin: 0; }
+.class-detail-heading {
+  margin: 0 0 0.4rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-display);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+.class-detail-items {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+.class-detail-items li { margin-bottom: 0.15rem; }

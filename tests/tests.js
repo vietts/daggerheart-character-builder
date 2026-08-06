@@ -865,6 +865,31 @@ group("Every id in effects.js still exists in data/");
     missing.length ? `not found in data/:\n${missing.join("\n")}` : undefined);
 }
 
+group("Every class carries what the detail card shows");
+{
+  // The card is page code this suite can't render, but it reads eight fields straight out of
+  // classes.json — most of which nothing else in the app has ever touched. Renamed or dropped
+  // upstream, they'd surface as a blank section rather than as an error.
+  const classes = await (await fetch(`../data/classes.json${RUN}`)).json();
+  const text = (loc) => typeof loc?.["en-US"] === "string" && loc["en-US"] !== "";
+  const body = (desc) => Array.isArray(desc) && desc.length > 0 &&
+    desc.every((d) => text(d.paragraph) || (Array.isArray(d.list) && d.list.every(text)));
+  const feature = (f) => !!f && text(f.name) && body(f.description);
+
+  const incomplete = classes.filter((c) => !(
+    typeof c.name === "string" && c.name !== "" &&
+    Array.isArray(c.domains) && c.domains.length > 0 &&
+    Number.isFinite(c.startingEvasion) && Number.isFinite(c.startingHitPoints) &&
+    body(c.description) &&
+    Array.isArray(c.classItems) && c.classItems.length > 0 && c.classItems.every(text) &&
+    feature(c.hopeFeature) &&
+    Array.isArray(c.classFeatures) && c.classFeatures.length > 0 && c.classFeatures.every(feature)
+  )).map((c) => c.name);
+
+  check(`all ${classes.length} classes carry every field the card reads`, incomplete.length === 0,
+    incomplete.length ? `incomplete: ${incomplete.join(", ")}` : undefined);
+}
+
 // ---------- report ----------
 
 const results = document.getElementById("results");

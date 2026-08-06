@@ -45,11 +45,15 @@ export function renderCardArt(card) {
   return wrap;
 }
 
-// Feature markup for the CSS-only fallback, shared by domain cards, subclasses,
-// ancestries and communities: they all share the same shape { name, description: [{paragraph}] }.
-// Name and body stay separate elements (not one flattened string) so the fallback can
-// give them distinct typography (name stands out, body stays readable).
-function featuresHtml(features) {
+// Feature markup, shared by domain cards, subclasses, ancestries, communities and classes:
+// they all share the same shape { name, description: [{paragraph}] }.
+// Name and body stay separate elements (not one flattened string) so they can be given
+// distinct typography (name stands out, body stays readable).
+//
+// The fallback-* class names are historical — this markup started life inside the
+// missing-art fallback card — but it's the app's only feature-text rendering, and the class
+// detail card uses it too.
+export function featuresHtml(features) {
   return (features || [])
     .map((f) => {
       const name = f.name?.["en-US"] || "";
@@ -66,7 +70,7 @@ function featuresHtml(features) {
 // A description is a sequence of items, most of them paragraphs but some of them bulleted
 // lists (e.g. the elements a Warden of the Elements can Channel). Each item keeps its own
 // element, so paragraphs don't run together and list items don't vanish.
-function descriptionHtml(description) {
+export function descriptionHtml(description) {
   return (description || [])
     .map((d) => {
       if (d.paragraph) return `<p class="fallback-feature-desc">${escapeHtml(d.paragraph["en-US"] || "")}</p>`;

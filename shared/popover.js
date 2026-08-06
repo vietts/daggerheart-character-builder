@@ -1,4 +1,5 @@
-// Shared "where does this number come from?" popover, opened by the ? next to a stat.
+// The shared centered modal, plus the "where does this number come from?" breakdown that
+// opens in it from the ? next to a stat.
 // Same shape as lightbox.js: one overlay created lazily and reused by every page, closed by
 // its button, by clicking outside it, or by Escape.
 //
@@ -39,13 +40,24 @@ function ensureOverlay() {
 const signed = (n) => (n > 0 ? `+${n}` : String(n));
 
 /**
+ * Opens the modal with a title and whatever body the caller wants in it.
+ * @param {string} title
+ * @param {Node|string} body a node to append, or HTML the caller has already escaped
+ */
+export function openModal(title, body) {
+  ensureOverlay();
+  titleEl.textContent = title;
+  bodyEl.innerHTML = "";
+  if (body instanceof Node) bodyEl.appendChild(body);
+  else bodyEl.innerHTML = body;
+  overlay.classList.add("open");
+}
+
+/**
  * @param {string} title the stat's name
  * @param {{ total: number|string, parts: Array<{label: string, value: number}>, note?: string }} breakdown
  */
 export function openPopover(title, breakdown) {
-  ensureOverlay();
-  titleEl.textContent = title;
-
   const rows = (breakdown.parts || [])
     .map((p) => `<div class="popover-row"><span>${escapeHtml(p.label)}</span><strong>${escapeHtml(signed(p.value))}</strong></div>`)
     .join("");
@@ -56,8 +68,7 @@ export function openPopover(title, breakdown) {
     : "";
   const note = breakdown.note ? `<p class="popover-note">${escapeHtml(breakdown.note)}</p>` : "";
 
-  bodyEl.innerHTML = rows + total + note;
-  overlay.classList.add("open");
+  openModal(title, rows + total + note);
 }
 
 export function closePopover() {
