@@ -50,8 +50,9 @@ export function openPopover(title, breakdown) {
     .map((p) => `<div class="popover-row"><span>${escapeHtml(p.label)}</span><strong>${escapeHtml(signed(p.value))}</strong></div>`)
     .join("");
   // A single-source stat still answers a real question ("why is my Evasion 12?"), but a
-  // total line under one row is just the same number twice.
-  const total = (breakdown.parts || []).length > 1
+  // total line under one row is just the same number twice. Some stats aren't a sum at all —
+  // Spellcast names a trait, an unarmed attack offers two — and they carry no total to show.
+  const total = (breakdown.parts || []).length > 1 && breakdown.total != null
     ? `<div class="popover-row popover-total"><span>Total</span><strong>${escapeHtml(breakdown.total)}</strong></div>`
     : "";
   const note = breakdown.note ? `<p class="popover-note">${escapeHtml(breakdown.note)}</p>` : "";

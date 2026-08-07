@@ -47,6 +47,7 @@ const {
   validateLevelUps,
 } = await import(`../shared/history.js${RUN}`);
 const {
+  UNARMED_PROFILE,
   derivedStats,
   effectBonuses,
   evasionTotal,
@@ -56,9 +57,20 @@ const {
 const {
   EFFECTS,
   blankAnswer,
+  ignoresBurden,
   isAnswered,
   unresolvedChoices,
 } = await import(`../shared/effects.js${RUN}`);
+const {
+  UNARMED,
+  UNARMORED,
+  burdenWarning,
+  damageText,
+  featureLine,
+  enumLabel,
+  groupByTier,
+  weaponStats,
+} = await import(`../shared/gear.js${RUN}`);
 
 // ---------- tiny runner ----------
 
@@ -603,19 +615,28 @@ group("Armor Score, thresholds, and the unarmored rule");
   check("and says so when it clamps", !!capped.armorScore.note);
 }
 
-group("Attack uses the weapon's trait, Spellcast names the subclass's");
+group("Attack uses the weapon's trait, and a secondary counts because it's equipped");
 {
-  const twoHanded = derivedStats(statChar({
-    equipment: { weaponMode: "two-handed", primaryWeaponId: "staff", secondaryWeaponId: "dagger" },
+  // This used to assert that a "two-handed" weaponMode meant no secondary attack. That stopped
+  // being true the moment a Warrior — who ignores burden — could carry a shield behind a
+  // greatsword: their secondary attack came back null and the shield's Barrier went missing
+  // from their Armor Score. What's equipped is now the only question asked.
+  const both = derivedStats(statChar({
+    equipment: { primaryWeaponId: "staff", secondaryWeaponId: "dagger" },
   }), STAT_DB);
   // knowledge is -1 in the fixture, finesse is 0
-  eq("primary attack is the weapon's trait, not Proficiency", twoHanded.primaryAttack.total, -1);
-  check("a two-handed build has no secondary attack", twoHanded.secondaryAttack === null);
+  eq("primary attack is the weapon's trait, not Proficiency", both.primaryAttack.total, -1);
+  eq("the off-hand weapon uses its own trait, whatever the primary's burden",
+    both.secondaryAttack.total, 0);
 
-  const oneHanded = derivedStats(statChar({
-    equipment: { weaponMode: "one-handed", primaryWeaponId: "staff", secondaryWeaponId: "dagger" },
-  }), STAT_DB);
-  eq("the off-hand weapon uses its own trait", oneHanded.secondaryAttack.total, 0);
+  check("with no secondary equipped there is no secondary attack",
+    derivedStats(statChar({ equipment: { primaryWeaponId: "staff" } }), STAT_DB).secondaryAttack === null);
+
+  // Characters saved before this change still carry the field. It has to mean nothing.
+  check("a leftover weaponMode from an older save changes nothing",
+    derivedStats(statChar({
+      equipment: { weaponMode: "two-handed", primaryWeaponId: "staff", secondaryWeaponId: "dagger" },
+    }), STAT_DB).secondaryAttack !== null);
 
   eq("Spellcast shows the trait, not a number", derivedStats(statChar(), STAT_DB).spellcast.display, "Knowledge");
   check("subclasses without one get no Spellcast box",
@@ -629,6 +650,85 @@ group("A page that didn't load every data file still gets what it asked for");
   eq("class-based stats still work", partial.hitPoints.total, 7);
   check("equipment-based ones come back null rather than throwing", partial.armorScore === null);
   check("and so do the attacks", partial.primaryAttack === null);
+}
+
+group("A weapon reads as prose, not as the JSON it came from");
+{
+  const longsword = {
+    id: "core_weapon_longsword", name: { "en-US": "Longsword" }, type: "PRIMARY_PHYSICAL",
+    tier: 1, trait: "AGILITY", range: "MELEE",
+    damage: { dice: "D10", modifier: 3, type: "PHYSICAL" }, burden: "TWO_HANDED",
+  };
+  eq("the SCREAMING_SNAKE values are read out in English", enumLabel("VERY_CLOSE"), "Very Close");
+  // The picker used to print "D10 phy" for this: the +3 was simply dropped, on 20 of the 32
+  // weapons a starting character can pick between.
+  eq("the damage modifier is part of the damage", damageText(longsword), "d10+3 phy");
+  eq("a weapon with no modifier just names the die",
+    damageText({ damage: { dice: "D8", type: "MAGICAL" } }), "d8 mag");
+  // One weapon in the book (the Ghostblade) deals either kind; it used to be labelled "mag".
+  eq("and the both-kinds weapon says both",
+    damageText({ damage: { dice: "D10", modifier: 7, type: "PHYSICAL_OR_MAGICAL" } }), "d10+7 phy/mag");
+  eq("the whole line", weaponStats(longsword), "Agility · Melee · d10+3 phy · Two-handed");
+
+  // Fixtures here carry only the fields the check under test needs, and an unarmed profile has
+  // no burden at all. A formatter that dereferenced damage.dice would make every other check in
+  // this file depend on data it doesn't use.
+  eq("fields a record doesn't carry are left out, not printed as undefined",
+    weaponStats({ trait: "FINESSE", burden: "ONE_HANDED" }), "Finesse · One-handed");
+  eq("and no weapon at all is not a crash", weaponStats(null), "");
+
+  // Consumables carry a feature with no name, and the sheet puts potions through the same
+  // renderer as weapons — without this it read "Minor Health Potion : Clear 1d4 HP."
+  eq("a nameless feature is just its text",
+    featureLine({ features: [{ description: [{ paragraph: { "en-US": "Clear 1d4 HP." } }] }] }),
+    `<span class="option-feature">Clear 1d4 HP.</span>`);
+  eq("a named one still reads name-then-text",
+    featureLine({ features: [{ name: { "en-US": "Reliable" }, description: [{ paragraph: { "en-US": "+1 to attack rolls" } }] }] }),
+    `<span class="option-feature"><em>Reliable</em>: +1 to attack rolls</span>`);
+}
+
+group("Burden is advice, and the Warrior doesn't even get the advice");
+{
+  const greatsword = { name: { "en-US": "Greatsword" }, burden: "TWO_HANDED" };
+  const broadsword = { name: { "en-US": "Broadsword" }, burden: "ONE_HANDED" };
+  const shield = { name: { "en-US": "Tower Shield" }, burden: "ONE_HANDED" };
+
+  check("a secondary behind a two-handed primary is flagged", !!burdenWarning(greatsword, shield, false));
+  check("a one-handed primary never is", burdenWarning(broadsword, shield, false) === null);
+  check("nor is a two-handed primary carried on its own", burdenWarning(greatsword, null, false) === null);
+  // "You ignore burden when equipping weapons." — Combat Training, in full.
+  check("and a Warrior isn't warned at all", burdenWarning(greatsword, shield, true) === null);
+
+  const WARRIOR = {
+    id: "core_class_warrior", name: "WARRIOR",
+    classFeatures: [{ name: { "en-US": "Combat Training" } }, { name: { "en-US": "Attack of Opportunity" } }],
+  };
+  const GUARDIAN = { id: "cls", name: "GUARDIAN", classFeatures: [{ name: { "en-US": "Unstoppable" } }] };
+  check("Combat Training is what says so",
+    ignoresBurden({ classId: "core_class_warrior" }, { classes: [WARRIOR, GUARDIAN] }));
+  check("and no other class does", !ignoresBurden({ classId: "cls" }, { classes: [WARRIOR, GUARDIAN] }));
+  check("a page that didn't load classes doesn't throw", !ignoresBurden({ classId: "cls" }, {}));
+}
+
+group("A picker opens the tiers worth reading");
+{
+  const gear = [
+    { id: "t1a", tier: 1 }, { id: "t1b", tier: 1 },
+    { id: "t2a", tier: 2 }, { id: "t3a", tier: 3 }, { id: "t4a", tier: 4 },
+  ];
+  const tiersOf = (groups) => groups.map((g) => g.tier);
+  const openOf = (groups) => groups.filter((g) => g.open).map((g) => g.tier);
+
+  eq("every tier in the book, lowest first", tiersOf(groupByTier(gear, { tier: 3 })), [1, 2, 3, 4]);
+  eq("the character's own tier is open", openOf(groupByTier(gear, { tier: 3 })), [3]);
+  // A shield handed out at level 1 is still yours at level 8, and a picker that hides what
+  // you're carrying is a picker that lies.
+  eq("so is whichever tier holds what they're carrying",
+    openOf(groupByTier(gear, { tier: 4, equippedId: "t1b" })), [1, 4]);
+  eq("and that's one group, not two, when they coincide",
+    openOf(groupByTier(gear, { tier: 2, equippedId: "t2a" })), [2]);
+  eq("carrying nothing opens only your tier",
+    openOf(groupByTier(gear, { tier: 1, equippedId: null })), [1]);
 }
 
 group("The level up screen and the sheet share the same arithmetic");
@@ -666,6 +766,7 @@ const FX_DB = {
   ],
   domainCards: [
     { id: "core_domain_card_untouchable", name: { "en-US": "Untouchable" }, domain: "BONE", level: 1 },
+    { id: "core_domain_card_bare_bones", name: { "en-US": "Bare Bones" }, domain: "VALOR", level: 1 },
     { id: "core_domain_card_vitality", name: { "en-US": "Vitality" }, domain: "BLADE", level: 5 },
     { id: "core_domain_card_codex_touched", name: { "en-US": "Codex-Touched" }, domain: "CODEX", level: 7 },
     ...["a", "b", "c"].map((s) => ({ id: `codex_${s}`, name: { "en-US": `Codex ${s}` }, domain: "CODEX", level: 1 })),
@@ -720,10 +821,111 @@ group("Equipment changes traits, Evasion, Armor Score and attacks");
   eq("Tower Shield's Barrier is +2 Armor Score", sword.armorScore.total, 6);
   eq("Barrier's -1 Evasion lands too", sword.evasion.total, 6);
 
+  // The same shield behind a two-handed primary — a Warrior's Combat Training says they can.
+  // This is the case the old weaponMode gate got wrong: the shield was equipped and did nothing.
+  const shielded = derivedStats(statChar({
+    equipment: { primaryWeaponId: "staff", secondaryWeaponId: "core_weapon_tower_shield" },
+  }), FX_DB);
+  // No armor, so Armor Score is Barrier's +2 alone; Evasion is the class's 9 less Barrier's 1.
+  eq("a shield's Barrier applies behind a two-handed primary too", shielded.armorScore.total, 2);
+  eq("and so does its -1 Evasion", shielded.evasion.total, 8);
+
   // "+1 to Spellcast Rolls" is not "+1 to Knowledge": a plain Knowledge roll doesn't get it.
   const chan = derivedStats(statChar({ equipment: { armorId: "core_armor_channeling_armor" } }), FX_DB);
   eq("Channeling armor shows on the Spellcast box", chan.spellcast.display, "Knowledge +1");
   eq("but never on the trait itself", chan.traits.knowledge.total, -1);
+}
+
+group("Choosing to wear nothing");
+{
+  // The SRD's plain unarmored rule, reachable at last: Armor Score 0, Major threshold equal to
+  // your level and Severe twice your level.
+  const bare = derivedStats(statChar({ level: 3, equipment: { armorId: UNARMORED } }), FX_DB);
+  eq("no armor means an Armor Score of 0", bare.armorScore.total, 0);
+  eq("Major threshold is your level", bare.majorThreshold.total, 3);
+  eq("and Severe is twice it", bare.severeThreshold.total, 6);
+
+  // Not the same state as never having chosen — but the arithmetic can't tell them apart, and
+  // shouldn't: a character mid-creation has no armor either.
+  const unset = derivedStats(statChar({ level: 3, equipment: {} }), FX_DB);
+  eq("having chosen nothing yet works out the same", unset.armorScore.total, bare.armorScore.total);
+
+  // The sentinel is a marker, not an id: nothing must go looking for armor by that name.
+  check("it matches no armor in the data", !FX_DB.armors.some((a) => a.id === UNARMORED));
+
+  // A shield is still a shield with no body armor under it.
+  const shielded = derivedStats(statChar({
+    equipment: { armorId: UNARMORED, secondaryWeaponId: "core_weapon_tower_shield" },
+  }), FX_DB);
+  eq("a shield's Armor Score still applies", shielded.armorScore.total, 2);
+}
+
+group("Fighting with nothing in your hands");
+{
+  // "Unarmed attack rolls use either Strength or Finesse (GM's choice)." The sheet reports both
+  // rather than quietly picking the better one — that choice belongs to the table.
+  // strength is +2 in the fixture, finesse 0.
+  const bare = derivedStats(statChar({ equipment: { primaryWeaponId: UNARMED } }), FX_DB);
+  // signed() writes zero as "0", the same as every other stat box on the sheet.
+  eq("both traits are offered, neither is chosen", bare.primaryAttack.display, "Strength +2 / Finesse 0");
+  eq("and the breakdown shows each of them",
+    bare.primaryAttack.parts.map((p) => p.label), ["Strength (unarmed)", "Finesse (unarmed)"]);
+  check("with a note saying whose choice it is", /GM/.test(bare.primaryAttack.note));
+
+  // "Successful unarmed attacks inflict [Proficiency]d4 damage" — d4 is the rating, in the same
+  // sense d10+3 is a Longsword's.
+  eq("bare hands hit for d4", weaponStats(UNARMED_PROFILE), "Strength or Finesse · Melee · d4 phy");
+
+  // The sentinel is a marker, not an id.
+  check("it matches no weapon in the data", !FX_DB.weapons.some((w) => w.id === UNARMED));
+  eq("and carries no weapon features into the effects", 
+    derivedStats(statChar({ equipment: { primaryWeaponId: UNARMED } }), FX_DB).evasion.total, 9);
+
+  // Same rule as a weapon: no attack line until the traits are assigned.
+  const noTraits = statChar({ equipment: { primaryWeaponId: UNARMED } });
+  noTraits.traits = { agility: null, strength: null, finesse: null, instinct: null, presence: null, knowledge: null };
+  check("unassigned traits mean no attack yet, just as with a weapon",
+    derivedStats(noTraits, FX_DB).primaryAttack === null);
+
+  // A secondary is still a secondary when the other hand is empty.
+  const withShield = derivedStats(statChar({
+    equipment: { primaryWeaponId: UNARMED, secondaryWeaponId: "core_weapon_tower_shield" },
+  }), FX_DB);
+  eq("an off-hand weapon still applies", withShield.armorScore.total, 2);
+  check("and still gets its own attack", withShield.secondaryAttack !== null);
+}
+
+group("Bare Bones stands in for the armor you didn't wear");
+{
+  // strength is +2 in the fixture. Tier 1 base thresholds are 9/19, and your level goes on top
+  // of those exactly as it would on top of a breastplate's.
+  const bones = (over) => derivedStats(statChar({
+    equipment: { armorId: UNARMORED }, domainCardIds: ["core_domain_card_bare_bones"], ...over,
+  }), FX_DB);
+
+  const lv1 = bones({ level: 1 });
+  eq("base Armor Score is 3 + your Strength", lv1.armorScore.total, 5);
+  eq("Major is the card's 9 plus your level", lv1.majorThreshold.total, 10);
+  eq("Severe is the card's 19 plus your level", lv1.severeThreshold.total, 20);
+  eq("and the breakdown names the card, where armor would have named itself",
+    lv1.armorScore.parts[0].label, "Bare Bones");
+
+  // Tier 3 is levels 5-7, so the base moves to 13/31.
+  const lv6 = bones({ level: 6 });
+  eq("the thresholds follow your tier", [lv6.majorThreshold.total, lv6.severeThreshold.total], [19, 37]);
+
+  // A shield is still a shield: additive effects stack on the override as they would on armor.
+  const shielded = bones({ equipment: { armorId: UNARMORED, secondaryWeaponId: "core_weapon_tower_shield" } });
+  eq("Barrier adds to Bare Bones' base", shielded.armorScore.total, 7);
+
+  // "When you choose NOT to equip armor" — wearing any means the card does nothing.
+  const armored = bones({ equipment: { armorId: "gambeson" } });
+  eq("wearing armor, the card is silent", armored.armorScore.total, 3);
+
+  // It's a loadout card, so it stops applying the moment it's vaulted.
+  const vaulted = bones({ domainVaultIds: ["core_domain_card_bare_bones"] });
+  eq("vaulting it gives the plain unarmored rule back", vaulted.armorScore.total, 0);
+  eq("thresholds too", vaulted.majorThreshold.total, 1);
 }
 
 group("Loadout cards apply, vaulted ones don't");
@@ -840,8 +1042,14 @@ group("Every id in effects.js still exists in data/");
   // The one group that reads data/ for real. An upstream refresh that renames an id would
   // otherwise drop an effect silently: no error, just a number that quietly stops being right.
   const load = async (name) => (await fetch(`../data/${name}.json${RUN}`)).json();
-  const [ancestries, subclasses, armors, weapons, cards] = await Promise.all(
-    ["ancestries", "subclasses", "armors", "weapons", "domain-cards"].map(load));
+  const [ancestries, subclasses, armors, weapons, cards, classes] = await Promise.all(
+    ["ancestries", "subclasses", "armors", "weapons", "domain-cards", "classes"].map(load));
+
+  // ignoresBurden() matches a class feature by name rather than by an EFFECTS key, so the check
+  // below can't cover it. Renamed upstream, the Warrior would silently start getting a burden
+  // warning the book says they're exempt from.
+  check("the Warrior still has Combat Training to ignore burden with",
+    ignoresBurden({ classId: "core_class_warrior" }, { classes }));
 
   const known = new Set();
   const featureKeys = (list, prefix) => {

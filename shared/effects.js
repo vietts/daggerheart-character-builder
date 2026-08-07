@@ -63,21 +63,33 @@
 // New code is needed only for a genuinely new KIND of thing: a stat the app doesn't compute
 // yet, or a choice that isn't one of the two shapes above.
 //
-// One card is deliberately absent. Bare Bones replaces your base Armor Score and damage
-// thresholds when you choose NOT to equip armor, and the wizard requires armor, so it would be
-// the only user of an effect kind that overrides a base rather than adding to it. When
-// equipping and unequipping lands, it unlocks three things at once: Bare Bones, the
-// base-override kind it needs, and the plain unarmored rule (Armor Score 0, Major threshold =
-// your level, Severe = twice your level) for characters who don't have it. That last one is
-// already implemented in derived-stats.js, waiting for something to reach it.
+// TWO KINDS OF EFFECT
+// -------------------
+// Most entries are ADDITIVE: a key from EFFECT_STAT_KEYS naming a number to add to whatever the
+// stat would otherwise be. A few are BASE OVERRIDES, declared under `base`, which stand in for
+// the value a stat starts from rather than adding to it — what a piece of equipment would have
+// contributed, when you have no such equipment. Additive effects then stack on top of the
+// override exactly as they would on top of armor, so a shield still works.
+//
+// `base` is a sibling of the additive keys, not a different kind of entry, so one entry can do
+// both if a card ever needs to. Its values are functions of the same context.
 
-import { SUBCLASS_TIER_ORDER } from "./advancement.js";
+import { SUBCLASS_TIER_ORDER, tierForLevel } from "./advancement.js";
+import { UNARMED, UNARMORED } from "./gear.js";
 
 // Requirement shared by the *-Touched cards: "When 4 or more of the domain cards in your
 // loadout are from the X domain". The card is itself an X card, so it counts toward its own 4.
 const touched = (domain) => (c) => (c.domainCounts[domain] || 0) >= 4;
 
 const ONCE_PER_REST = "needs an action or a rest, so it isn't counted here";
+
+// Bare Bones' base thresholds, by tier, straight off the card.
+const BARE_BONES_THRESHOLDS = {
+  1: { major: 9, severe: 19 },
+  2: { major: 11, severe: 24 },
+  3: { major: 13, severe: 31 },
+  4: { major: 15, severe: 38 },
+};
 
 export const EFFECTS = {
   // ===================== Ancestries =====================
@@ -199,6 +211,22 @@ export const EFFECTS = {
   // The SRD's general rule: "if you need to round to a whole number, round up unless otherwise
   // specified", so Agility +1 gives +1, not 0.
   "core_domain_card_untouchable": { evasion: (c) => Math.ceil(c.traits.agility / 2) },
+
+  // Bare Bones — "When you choose not to equip armor, you have a base Armor Score of 3 + your
+  // Strength and use the following as your base damage thresholds: Tier 1: 9/19, Tier 2: 11/24,
+  // Tier 3: 13/31, Tier 4: 15/38."
+  //
+  // Base, not bonus: it stands in for the armor you're not wearing, so your level is added on
+  // top of those thresholds exactly as it would be on top of a breastplate's. Choosing not to
+  // equip armor is a configuration rather than an action, so it counts.
+  "core_domain_card_bare_bones": {
+    when: (c) => !c.armor,
+    base: {
+      armorScore: (c) => 3 + c.traits.strength,
+      majorThreshold: (c) => BARE_BONES_THRESHOLDS[tierForLevel(c.level)].major,
+      severeThreshold: (c) => BARE_BONES_THRESHOLDS[tierForLevel(c.level)].severe,
+    },
+  },
 
   // Fortified Armor — "While you are wearing armor, gain a +2 bonus to your damage thresholds."
   // Wearing armor is a configuration, not an action, so this counts.
@@ -373,13 +401,23 @@ export function collectEffects(ch, db) {
     }
   }
 
-  const armor = (db?.armors || []).find((a) => a.id === ch.equipment?.armorId);
+  // A character who chose to wear nothing has no armor features; the sentinel matches no id,
+  // and asking for it explicitly beats relying on the lookup to miss.
+  const armor = ch.equipment?.armorId === UNARMORED
+    ? undefined
+    : (db?.armors || []).find((a) => a.id === ch.equipment?.armorId);
   for (const name of featureNames(armor)) {
     add(lookup(`${armor.id}:${name}`, `armor:${name}`), "armor", `${displayName(armor, "Armor")} (${name})`);
   }
 
-  const weaponSlots = [["primary", ch.equipment?.primaryWeaponId]];
-  if (ch.equipment?.weaponMode === "one-handed") weaponSlots.push(["secondary", ch.equipment?.secondaryWeaponId]);
+  // Both slots, always: what's equipped is what applies. See derived-stats.js for why the old
+  // weaponMode gate had to go.
+  // Bare hands carry no features, and the sentinel matches no id — asked outright rather than
+  // left to the lookup to miss, same as the armor above.
+  const weaponSlots = [
+    ["primary", ch.equipment?.primaryWeaponId === UNARMED ? null : ch.equipment?.primaryWeaponId],
+    ["secondary", ch.equipment?.secondaryWeaponId],
+  ];
   for (const [scope, weaponId] of weaponSlots) {
     const weapon = (db?.weapons || []).find((w) => w.id === weaponId);
     for (const name of featureNames(weapon)) {
@@ -446,4 +484,15 @@ export function unresolvedChoices(ch, db) {
   return collectEffects(ch, db)
     .filter((e) => e.effect.choice && !isAnswered(e.effect.choice, ch.effectChoices?.[e.key]))
     .map((e) => ({ key: e.key, label: e.label, prompt: e.effect.choice.prompt }));
+}
+
+// "You ignore burden when equipping weapons." — the Warrior's Combat Training.
+//
+// Not an EFFECTS entry: it moves no stat, so there's nothing for EFFECT_STAT_KEYS to carry. It
+// lives here anyway because this is the file allowed to know a feature by name, and the answer
+// is a rule, not a presentation detail. The burden advice in the wizard asks this before it
+// says anything.
+export function ignoresBurden(ch, db) {
+  const cls = (db?.classes || []).find((c) => c.id === ch?.classId);
+  return (cls?.classFeatures || []).some((f) => f.name?.["en-US"] === "Combat Training");
 }

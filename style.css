@@ -537,6 +537,40 @@ h1, h2, h3, .btn-primary, .btn-ghost, .btn-small, .top-nav a {
 .detail-summary p { margin: 0.3rem 0; }
 .detail-summary strong { color: var(--accent-bright); font-family: var(--font-display); letter-spacing: 0.01em; }
 
+/* ---------- Scelta dell'equipaggiamento ---------- */
+/* Ogni tier del manuale è un blocco richiudibile: quello del personaggio (e quello che
+   contiene ciò che ha già in mano) è aperto, gli altri sono chiusi ma raggiungibili — il
+   livello dice da dove cominciare a guardare, non cosa il GM può consegnare. */
+
+/* Sulla scheda le statistiche vanno a capo sotto al nome: sono da leggere, non da scorrere. */
+.gear-stats { display: block; font-size: 0.78rem; color: var(--text-dim); }
+
+.gear-tier { margin-bottom: 0.4rem; }
+.gear-tier > summary {
+  cursor: pointer;
+  padding: 0.25rem 0;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+}
+.gear-tier[open] > summary { color: var(--accent); }
+/* Senza un tetto all'altezza, un tier aperto (44 armi, ai livelli alti) spinge il tasto
+   "Avanti" fuori dallo schermo ogni volta che si apre. */
+.gear-tier .option-list { max-height: 22rem; overflow-y: auto; }
+.gear-filter {
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 0.4rem 0.55rem;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.82rem;
+}
+
 @media (max-width: 900px) {
   .wizard-layout { grid-template-columns: 1fr; }
   .wizard-nav { position: static; }

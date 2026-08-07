@@ -5,21 +5,28 @@ import {
   communityCardArtPath,
   ancestryCardArtPath,
 } from "./shared/card-render.js";
-import { blankSlotsUsed, ensureLevelFields } from "./shared/advancement.js";
+import { blankSlotsUsed, ensureLevelFields, tierForLevel } from "./shared/advancement.js";
 import { recomputeCharacter } from "./shared/history.js";
 import { derivedStats } from "./shared/derived-stats.js";
 import { statLine } from "./shared/stat-line.js";
-import { EFFECTS, blankAnswer, collectEffects } from "./shared/effects.js";
+import { EFFECTS, blankAnswer, collectEffects, ignoresBurden } from "./shared/effects.js";
 import { renderEffectChoice } from "./shared/effect-choice.js";
+import {
+  armorRowContent,
+  burdenWarning,
+  groupByTier,
+  featureText,
+  UNARMED,
+  UNARMORED,
+  matchesSpellcast,
+  spellcastBadge,
+  weaponRowContent,
+} from "./shared/gear.js";
 import { escapeHtml } from "./shared/escape.js";
 
 const CHAR_STORAGE_KEY = "dh-characters-v1";
 const TRAIT_KEYS = ["agility", "strength", "finesse", "instinct", "presence", "knowledge"];
 const TRAIT_LABELS = { agility: "Agility", strength: "Strength", finesse: "Finesse", instinct: "Instinct", presence: "Presence", knowledge: "Knowledge" };
-
-function spellcastBadge() {
-  return `<span class="badge-spellcast" title="Spellcasting trait">★ spellcasting</span>`;
-}
 
 const TRAIT_ARRAY = [2, 1, 1, 0, 0, -1];
 const MINOR_HEALTH_POTION_ID = "core_consumable_minor_health_potion";
@@ -40,13 +47,10 @@ const STEPS = [
 const db = {}; // populated by loadAllData(): classes, subclasses, ancestries, communities, domainCards, weapons, armors, consumables
 let character = null;
 let currentStep = 0;
+let gearFilter = ""; // the equipment step's name filter, kept across re-renders
 
 function titleCase(str) {
   return str.charAt(0) + str.slice(1).toLowerCase();
-}
-
-function featureText(feature) {
-  return (feature.description || []).map((d) => d.paragraph?.["en-US"] || "").join(" ");
 }
 
 async function loadJson(name) {
@@ -99,7 +103,9 @@ function blankCharacter(id) {
     subclassId: null,
     heritage: { ancestryMode: "pure", ancestryIds: [], chosenFeatures: [], communityId: null },
     traits: { agility: null, strength: null, finesse: null, instinct: null, presence: null, knowledge: null },
-    equipment: { weaponMode: "two-handed", primaryWeaponId: null, secondaryWeaponId: null, armorId: null, potionChoice: null },
+    // No weaponMode: what's equipped is the truth. Older saves still carry the field;
+    // nothing reads it, so there's nothing to migrate.
+    equipment: { primaryWeaponId: null, secondaryWeaponId: null, armorId: null, potionChoice: null },
     background: { description: "", answers: "" },
     experiences: [
       { id: "exp_start1", name: "", modifier: 2, baseModifier: 2, sinceLevel: 1 },
@@ -124,10 +130,18 @@ function blankCharacter(id) {
 function initCharacter() {
   const params = new URLSearchParams(location.search);
   const id = params.get("id");
+  // The equipment step outlives creation, so the sheet links straight to it. Any step key works;
+  // an unknown one just starts at the beginning, as a bare ?id= always has.
+  const step = STEPS.findIndex((s) => s.key === params.get("step"));
+  if (step >= 0) currentStep = step;
   if (id) {
     const found = loadAllCharacters().find((c) => c.id === id);
     if (found) {
       character = ensureLevelFields(found);
+      // Coming back to change one thing isn't creating a character, and the page shouldn't
+      // greet you as though it were.
+      document.title = "Daggerheart — Edit Character";
+      document.querySelector(".topbar h1 span").textContent = "Edit Character";
       return;
     }
   }
@@ -167,9 +181,9 @@ function isStepValid(stepKey) {
       return true;
     case "equipment": {
       const e = character.equipment;
-      if (!e.armorId || !e.potionChoice) return false;
-      if (e.weaponMode === "two-handed") return !!e.primaryWeaponId;
-      return !!e.primaryWeaponId && !!e.secondaryWeaponId;
+      // A secondary weapon is optional: with a two-handed primary there's no hand for one, and
+      // even with a one-handed primary a character may simply not want one.
+      return !!e.armorId && !!e.potionChoice && !!e.primaryWeaponId;
     }
     case "background":
       return true;
@@ -535,56 +549,95 @@ function renderDerivedStep(panel) {
 }
 
 // --- Step 5: Equipment ---
+//
+// This step outlives character creation: it's where gear gets upgraded later too, reached
+// straight from the sheet. So the lists offer every tier in the book rather than only tier 1,
+// with the tier worth reading already open. At level 1 that's tier 1 and nothing else, which is
+// exactly what creation used to show.
 function renderEquipmentStep(panel) {
   const e = character.equipment;
   const spellcastTrait = selectedSubclass()?.spellcastTrait ?? null;
-
-  const modeRow = document.createElement("div");
-  modeRow.className = "field-row";
-  modeRow.innerHTML = `
-    <label><input type="radio" name="weapon-mode" value="two-handed" ${e.weaponMode === "two-handed" ? "checked" : ""}/> Two-handed primary</label>
-    <label><input type="radio" name="weapon-mode" value="one-handed" ${e.weaponMode === "one-handed" ? "checked" : ""}/> One-handed primary + secondary</label>
-  `;
-  panel.appendChild(modeRow);
-  modeRow.querySelectorAll('input[name="weapon-mode"]').forEach((r) => {
-    r.addEventListener("change", (ev) => {
-      e.weaponMode = ev.target.value;
-      e.primaryWeaponId = null;
-      e.secondaryWeaponId = null;
-      onChange();
-    });
-  });
-
-  const primaryBurden = e.weaponMode === "two-handed" ? "TWO_HANDED" : "ONE_HANDED";
-  const primaries = db.weapons.filter((w) => w.tier === 1 && w.burden === primaryBurden && (w.type === "PRIMARY_PHYSICAL" || w.type === "PRIMARY_MAGIC"));
+  const tier = tierForLevel(character.level);
 
   const h3a = document.createElement("h3");
-  h3a.textContent = "Primary weapon (Tier 1)";
+  h3a.textContent = "Primary weapon";
   panel.appendChild(h3a);
-  panel.appendChild(weaponSelect(primaries, e.primaryWeaponId, (id) => { e.primaryWeaponId = id; onChange(); }, spellcastTrait));
 
-  if (e.weaponMode === "one-handed") {
-    const secondaries = db.weapons.filter((w) => w.tier === 1 && w.type === "SECONDARY");
-    const h3b = document.createElement("h3");
-    h3b.textContent = "Secondary weapon (Tier 1)";
-    panel.appendChild(h3b);
-    panel.appendChild(weaponSelect(secondaries, e.secondaryWeaponId, (id) => { e.secondaryWeaponId = id; onChange(); }, spellcastTrait));
+  // The primary list is the long one — 43 or 44 weapons in each of the upper tiers, against ten
+  // or fewer for the other two lists, which is why only this one is worth filtering.
+  const primaries = db.weapons.filter((w) => w.type !== "SECONDARY");
+  const search = document.createElement("input");
+  search.type = "search";
+  search.className = "gear-filter";
+  search.placeholder = "Filter by name…";
+  search.value = gearFilter;
+  panel.appendChild(search);
+
+  const primaryList = document.createElement("div");
+  panel.appendChild(primaryList);
+  const renderPrimaries = () => {
+    primaryList.replaceChildren(gearList(primaries, {
+      groupName: "weapon-primary",
+      selectedId: e.primaryWeaponId,
+      onSelect: (id) => { e.primaryWeaponId = id; onChange(); },
+      rowContent: (w) => weaponRowContent(w, { spellcastTrait }),
+      rowClass: (w) => (matchesSpellcast(w, spellcastTrait) ? " trait-match" : ""),
+      tier,
+      filterText: gearFilter,
+      // Carrying nothing is a choice the rules have an answer for, and one a Brawler will make
+      // on purpose.
+      noneLabel: "Unarmed",
+      noneValue: UNARMED,
+    }));
+  };
+  renderPrimaries();
+  // Rebuilds only the list. Re-rendering the whole step would take the focus out of this input
+  // between keystrokes — the same trap onTextChange() exists to avoid.
+  search.addEventListener("input", (ev) => {
+    gearFilter = ev.target.value;
+    renderPrimaries();
+  });
+
+  const h3b = document.createElement("h3");
+  h3b.textContent = "Secondary weapon";
+  panel.appendChild(h3b);
+  panel.appendChild(gearList(db.weapons.filter((w) => w.type === "SECONDARY"), {
+    groupName: "weapon-secondary",
+    selectedId: e.secondaryWeaponId,
+    onSelect: (id) => { e.secondaryWeaponId = id; onChange(); },
+    rowContent: (w) => weaponRowContent(w, { spellcastTrait }),
+    rowClass: (w) => (matchesSpellcast(w, spellcastTrait) ? " trait-match" : ""),
+    tier,
+    // An off-hand weapon is optional, and a shield you can never put down is worse than no
+    // shield at all.
+    noneLabel: "No secondary weapon",
+  }));
+
+  const warning = burdenWarning(
+    db.weapons.find((w) => w.id === e.primaryWeaponId),
+    db.weapons.find((w) => w.id === e.secondaryWeaponId),
+    ignoresBurden(character, db),
+  );
+  if (warning) {
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = `⚠ ${warning}`;
+    panel.appendChild(p);
   }
 
   const h3c = document.createElement("h3");
-  h3c.textContent = "Armor (Tier 1)";
+  h3c.textContent = "Armor";
   panel.appendChild(h3c);
-  const armors = db.armors.filter((a) => a.tier === 1);
-  const armorList = document.createElement("div");
-  armorList.className = "option-list";
-  for (const a of armors) {
-    const row = document.createElement("label");
-    row.className = "option-row";
-    row.innerHTML = `<input type="radio" name="armor" value="${escapeHtml(a.id)}" ${e.armorId === a.id ? "checked" : ""}/> <strong>${escapeHtml(a.name["en-US"])}</strong> — thresholds ${escapeHtml(a.baseMajorThreshold)}/${escapeHtml(a.baseSevereThreshold)}, score ${escapeHtml(a.baseScore)}${featureLine(a)}`;
-    row.querySelector("input").addEventListener("change", () => { e.armorId = a.id; onChange(); });
-    armorList.appendChild(row);
-  }
-  panel.appendChild(armorList);
+  panel.appendChild(gearList(db.armors, {
+    groupName: "armor",
+    selectedId: e.armorId,
+    onSelect: (id) => { e.armorId = id; onChange(); },
+    rowContent: armorRowContent,
+    tier,
+    // Not the same as leaving the step unfinished, which is why it stores a value of its own.
+    noneLabel: "Unarmored",
+    noneValue: UNARMORED,
+  }));
 
   const h3d = document.createElement("h3");
   h3d.textContent = "Starting potion";
@@ -606,33 +659,51 @@ function renderEquipmentStep(panel) {
   panel.appendChild(fixed);
 }
 
-function weaponSelect(weapons, selectedId, onSelect, spellcastTrait) {
-  const list = document.createElement("div");
-  list.className = "option-list";
-  for (const w of weapons) {
-    const dmg = `${w.damage.dice} ${w.damage.type === "PHYSICAL" ? "phy" : "mag"}`;
-    const matchesSpellcast = !!spellcastTrait && w.trait === spellcastTrait;
-    const row = document.createElement("label");
-    row.className = "option-row" + (matchesSpellcast ? " trait-match" : "");
-    // The badge stays on the name line; featureLine() wraps to its own line below it.
-    const badge = matchesSpellcast ? ` ${spellcastBadge()}` : "";
-    row.innerHTML = `<input type="radio" name="weapon-${escapeHtml(w.type)}-${escapeHtml(w.burden)}" value="${escapeHtml(w.id)}" ${selectedId === w.id ? "checked" : ""}/> <strong>${escapeHtml(w.name["en-US"])}</strong> — ${escapeHtml(w.trait)} · ${escapeHtml(w.range)} · ${escapeHtml(dmg)}${badge}${featureLine(w)}`;
-    row.querySelector("input").addEventListener("change", () => onSelect(w.id));
-    list.appendChild(row);
-  }
-  return list;
-}
+// One picker: an optional "nothing" row, then one <details> per tier of the book. One radio
+// group name per list — it used to fold in the weapon's type and burden, which quietly made the
+// primary list two radio groups, harmless only because every pick re-renders the step.
+function gearList(items, { groupName, selectedId, onSelect, rowContent, rowClass, tier, noneLabel, noneValue = null, filterText }) {
+  const wrap = document.createElement("div");
 
-// Weapons and armor carry named features, several of which change a stat ("Flexible: +1 to
-// Evasion"). Without them the list reads as though the only difference between two pieces of
-// armor is its thresholds, which is how a player ends up surprised by their own Evasion.
-function featureLine(item) {
-  const features = (item.features || []).map((f) => {
-    const name = f.name?.["en-US"] || "";
-    const text = featureText(f);
-    return `<em>${escapeHtml(name)}</em>${text ? `: ${escapeHtml(text)}` : ""}`;
-  });
-  return features.length ? `<span class="option-feature">${features.join(" · ")}</span>` : "";
+  if (noneLabel) {
+    const row = document.createElement("label");
+    row.className = "option-row";
+    row.innerHTML = `<input type="radio" name="${escapeHtml(groupName)}" value="${escapeHtml(noneValue ?? "")}" ` +
+      `${selectedId === noneValue ? "checked" : ""}/> <strong>${escapeHtml(noneLabel)}</strong>`;
+    row.querySelector("input").addEventListener("change", () => onSelect(noneValue));
+    wrap.appendChild(row);
+  }
+
+  const needle = (filterText || "").trim().toLowerCase();
+  const matches = (item) => !needle || item.name["en-US"].toLowerCase().includes(needle);
+
+  for (const group of groupByTier(items, { tier, equippedId: selectedId })) {
+    const shown = group.items.filter(matches);
+    // A tier with nothing left in it is noise while filtering; a match inside a closed tier is
+    // worse than noise, so anything with a hit opens whatever the default would have been.
+    if (!shown.length) continue;
+
+    const details = document.createElement("details");
+    details.className = "gear-tier";
+    details.open = group.open || !!needle;
+    const summary = document.createElement("summary");
+    summary.textContent = group.tier === tier ? `Tier ${group.tier} — your tier` : `Tier ${group.tier}`;
+    details.appendChild(summary);
+
+    const list = document.createElement("div");
+    list.className = "option-list";
+    for (const item of shown) {
+      const row = document.createElement("label");
+      row.className = "option-row" + (rowClass ? rowClass(item) : "");
+      row.innerHTML = `<input type="radio" name="${escapeHtml(groupName)}" value="${escapeHtml(item.id)}" ` +
+        `${selectedId === item.id ? "checked" : ""}/> ${rowContent(item)}`;
+      row.querySelector("input").addEventListener("change", () => onSelect(item.id));
+      list.appendChild(row);
+    }
+    details.appendChild(list);
+    wrap.appendChild(details);
+  }
+  return wrap;
 }
 
 // --- Step 6: Background ---

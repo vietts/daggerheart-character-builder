@@ -25,9 +25,10 @@ import {
   unresolvedProblems,
   validateLevelUps,
 } from "./shared/history.js";
-import { derivedStats } from "./shared/derived-stats.js";
+import { UNARMED_PROFILE, derivedStats } from "./shared/derived-stats.js";
 import { statLine } from "./shared/stat-line.js";
-import { unresolvedChoices } from "./shared/effects.js";
+import { ignoresBurden, unresolvedChoices } from "./shared/effects.js";
+import { UNARMED, UNARMORED, armorStats, burdenWarning, featureLine, weaponStats } from "./shared/gear.js";
 import { escapeHtml } from "./shared/escape.js";
 
 const signed = (n) => (n > 0 ? `+${n}` : String(n));
@@ -553,7 +554,9 @@ function renderDetail() {
     ));
   }
   if (stats.primaryAttack) {
-    statsBox2.appendChild(statLine("Primary attack", signed(stats.primaryAttack.total), stats.primaryAttack));
+    // Unarmed reports two traits rather than one number, the way Spellcast does.
+    statsBox2.appendChild(statLine("Primary attack",
+      stats.primaryAttack.display ?? signed(stats.primaryAttack.total), stats.primaryAttack));
   }
   if (stats.secondaryAttack) {
     statsBox2.appendChild(statLine("Secondary attack", signed(stats.secondaryAttack.total), stats.secondaryAttack));
@@ -606,18 +609,43 @@ function renderDetail() {
   }
 
   const eq = ch.equipment;
-  const primary = findWeapon(eq.primaryWeaponId);
+  const unarmedPrimary = eq.primaryWeaponId === UNARMED;
+  const primary = unarmedPrimary ? UNARMED_PROFILE : findWeapon(eq.primaryWeaponId);
   const secondary = findWeapon(eq.secondaryWeaponId);
-  const armor = findArmor(eq.armorId);
+  // A character who chose to wear nothing says so, rather than showing the same dash as one
+  // who hasn't picked yet.
+  const unarmored = eq.armorId === UNARMORED;
+  const armor = unarmored ? { name: { "en-US": "Unarmored" } } : findArmor(eq.armorId);
   const potion = findConsumable(eq.potionChoice);
   const eqBox = document.createElement("div");
   eqBox.className = "detail-summary";
-  eqBox.innerHTML = `
-    <p><strong>Primary weapon:</strong> ${primary ? escapeHtml(primary.name["en-US"]) : "—"}</p>
-    ${secondary ? `<p><strong>Secondary weapon:</strong> ${escapeHtml(secondary.name["en-US"])}</p>` : ""}
-    <p><strong>Armor:</strong> ${armor ? escapeHtml(armor.name["en-US"]) : "—"}</p>
-    <p><strong>Potion:</strong> ${potion ? escapeHtml(potion.name["en-US"]) : "—"}</p>
-  `;
+  // A slot the sheet doesn't draw is a slot the player forgets they can fill, so an empty
+  // secondary says so rather than vanishing. The stats under each name are the ones that used
+  // to be visible only while picking the thing.
+  const gearLine = (label, item, stats) => `
+    <p><strong>${label}:</strong> ${item ? escapeHtml(item.name["en-US"]) : "—"}
+    ${item && stats ? `<span class="gear-stats">${escapeHtml(stats)}</span>` : ""}
+    ${item ? featureLine(item) : ""}</p>`;
+  eqBox.innerHTML =
+    gearLine("Primary weapon", primary, weaponStats(primary)) +
+    gearLine("Secondary weapon", secondary, weaponStats(secondary)) +
+    gearLine("Armor", armor, armorStats(armor)) +
+    gearLine("Potion", potion, "");
+
+  const warning = burdenWarning(primary, secondary, ignoresBurden(ch, db));
+  if (warning) {
+    const p = document.createElement("p");
+    p.className = "hint";
+    p.textContent = `⚠ ${warning}`;
+    eqBox.appendChild(p);
+  }
+
+  // Equipment is the one part of a character the sheet sends you back to the wizard for, so
+  // send you to the right step rather than to the start of it.
+  const changeBtn = button("Change equipment", "btn-small", () => {
+    location.href = `create.html?id=${ch.id}&step=equipment`;
+  });
+  eqBox.appendChild(changeBtn);
   container.appendChild(eqBox);
 
   const expBox = document.createElement("div");
@@ -762,12 +790,12 @@ function csvRowForCharacter(ch) {
     stats.evasion ? stats.evasion.total : "", stats.hitPoints ? stats.hitPoints.total : "", stats.stress.total, "2/6",
     stats.majorThreshold ? stats.majorThreshold.total : "", stats.severeThreshold ? stats.severeThreshold.total : "",
     stats.armorScore ? stats.armorScore.total : "",
-    stats.primaryAttack ? signed(stats.primaryAttack.total) : "",
+    stats.primaryAttack ? (stats.primaryAttack.display ?? signed(stats.primaryAttack.total)) : "",
     stats.secondaryAttack ? signed(stats.secondaryAttack.total) : "",
     stats.spellcast ? stats.spellcast.display : "",
-    findWeapon(ch.equipment.primaryWeaponId)?.name["en-US"] || "",
+    ch.equipment.primaryWeaponId === UNARMED ? "Unarmed" : findWeapon(ch.equipment.primaryWeaponId)?.name["en-US"] || "",
     findWeapon(ch.equipment.secondaryWeaponId)?.name["en-US"] || "",
-    findArmor(ch.equipment.armorId)?.name["en-US"] || "",
+    ch.equipment.armorId === UNARMORED ? "Unarmored" : findArmor(ch.equipment.armorId)?.name["en-US"] || "",
     findConsumable(ch.equipment.potionChoice)?.name["en-US"] || "",
     expText, loadoutNames, vaultNames,
     ch.background.description, ch.background.answers, ch.connectionsNotes,
