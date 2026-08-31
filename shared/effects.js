@@ -31,10 +31,16 @@
 // SHAPE
 // -----
 // Keys are `<entityId>:<discriminator>` — the tier for subclasses, the feature name for
-// ancestries, armor and weapons. Domain cards have a single feature block, so they're keyed by
-// id alone. Armor and weapon features that mean the same thing everywhere they appear are
+// ancestries, transformations, armor and weapons. Domain cards have a single feature block, so
+// they're keyed by id alone. Armor and weapon features that mean the same thing everywhere they appear are
 // keyed `armor:<feature>` / `weapon:<feature>`; the handful whose numbers differ per item
 // (Barrier, Protective) are keyed by item id, which takes precedence.
+//
+// The entity id is written WITHOUT the document prefix its record carries:
+// `domain_card_vitality`, not `srd_2_0_domain_card_vitality`. An effect belongs to the card, not
+// to the edition that printed it, so one entry here serves every edition that prints it and
+// lookup() strips the prefix before matching. That is also what keeps a character saved under an
+// older spelling of an id — `core_domain_card_vitality` — still finding its bonus.
 //
 // Values are numbers, or functions of a context object:
 //   { level, proficiency, traits, armor, domainCounts, character }
@@ -74,6 +80,7 @@
 // `base` is a sibling of the additive keys, not a different kind of entry, so one entry can do
 // both if a card ever needs to. Its values are functions of the same context.
 
+import { bareForms } from "./content-ids.js";
 import { SUBCLASS_TIER_ORDER, tierForLevel } from "./advancement.js";
 import { UNARMED, UNARMORED } from "./gear.js";
 
@@ -98,24 +105,24 @@ export const EFFECTS = {
   // Reach does not get the extra Hit Point slot.
 
   // Giant, Endurance — "Gain an additional Hit Point slot at character creation."
-  "core_ancestry_giant:Endurance": { hitPointSlots: 1 },
+  "ancestry_giant:Endurance": { hitPointSlots: 1 },
 
   // Human, High Stamina — "Gain an additional Stress slot at character creation."
-  "core_ancestry_human:High Stamina": { stressSlots: 1 },
+  "ancestry_human:High Stamina": { stressSlots: 1 },
 
   // Simiah, Nimble — "Gain a permanent +1 bonus to your Evasion at character creation."
   // Nimble is Simiah's SECOND feature; the other four stat features are their ancestry's first.
-  "core_ancestry_simiah:Nimble": { evasion: 1 },
+  "ancestry_simiah:Nimble": { evasion: 1 },
 
   // Galapa, Shell — "Gain a bonus to your damage thresholds equal to your Proficiency."
-  "core_ancestry_galapa:Shell": {
+  "ancestry_galapa:Shell": {
     majorThreshold: (c) => c.proficiency,
     severeThreshold: (c) => c.proficiency,
   },
 
   // Clank, Purposeful Design — "At character creation, choose one of your Experiences that best
   // aligns with this purpose and gain a permanent +1 bonus to it."
-  "core_ancestry_clank:Purposeful Design": {
+  "ancestry_clank:Purposeful Design": {
     choice: {
       prompt: "Purposeful Design: choose the Experience that best aligns with what you were made for.",
       kind: "experience",
@@ -123,35 +130,61 @@ export const EFFECTS = {
     },
   },
 
+  // ===================== Transformations =====================
+  // Keyed per feature, like an ancestry. A transformation is always in effect once a character
+  // has one — there is no vault to take it out of and nothing to choose between its two features
+  // — so anything catalogued here simply applies.
+  //
+  // Only ONE of SRD 2.0's twelve transformation features moves a number this app computes. The
+  // other eleven are read and deliberately left out: they are in-play actions (Wolf Form and
+  // Howling Rampage cost Stress to enter; Fangs is an attack you make; Feed spends tokens),
+  // rest-and-fiction rules (Unfinished Business, Corpse, Change Shape), a death move (Won't Stay
+  // Dead), or a mechanic this app has no stat for (Ephemeral's damage resistance). That is the
+  // same line every other entry in this file is drawn on — see WHAT GETS AN ENTRY above.
+
+  // Demigod, Gifted — "You gain a +1 bonus to action, reaction, and damage rolls."
+  // An attack roll and a Spellcast roll are both action rolls, and those are the two the sheet
+  // prints a number for. The damage bonus is excluded because damage isn't a stat here, and the
+  // paired drawback (Weight of Divinity) costs a Stress on a failure, which is play, not a total.
+  "transformation_demigod:Gifted": {
+    feature: "Gifted",
+    attack: 1,
+    spellcast: 1,
+    excluded: [
+      "+1 to damage rolls — damage isn't a stat this sheet totals",
+      "+1 to reaction rolls and other action rolls — no single number stands for them",
+    ],
+  },
+
   // ===================== Subclasses =====================
   // Keyed by tier. A tier implies every tier below it, so Stalwart at Mastery collects all
   // three of these and ends up at +6 thresholds.
 
   // School of War — "Gain an additional Hit Point slot."
-  "core_subclass_school_of_war:foundation": { feature: "Battlemage", hitPointSlots: 1 },
+  "subclass_school_of_war:foundation": { feature: "Battlemage", hitPointSlots: 1 },
 
   // Vengeance — "Gain an additional Stress slot."
-  "core_subclass_vengeance:foundation": { feature: "At Ease", stressSlots: 1 },
+  "subclass_vengeance:foundation": { feature: "At Ease", stressSlots: 1 },
 
   // Stalwart — "Gain a permanent +1 bonus to your damage thresholds." (Iron Will, the other
   // Foundation feature, spends an Armor Slot, so it isn't here.)
-  "core_subclass_stalwart:foundation": { feature: "Unwavering", majorThreshold: 1, severeThreshold: 1 },
+  "subclass_stalwart:foundation": { feature: "Unwavering", majorThreshold: 1, severeThreshold: 1 },
   // Stalwart — "Gain a permanent +2 bonus to your damage thresholds."
-  "core_subclass_stalwart:specialization": { feature: "Unrelenting", majorThreshold: 2, severeThreshold: 2 },
+  "subclass_stalwart:specialization": { feature: "Unrelenting", majorThreshold: 2, severeThreshold: 2 },
   // Stalwart — "Gain a permanent +3 bonus to your damage thresholds."
-  "core_subclass_stalwart:mastery": { feature: "Undaunted", majorThreshold: 3, severeThreshold: 3 },
+  "subclass_stalwart:mastery": { feature: "Undaunted", majorThreshold: 3, severeThreshold: 3 },
 
   // Nightwalker — "Gain a permanent +1 bonus to your Evasion."
-  "core_subclass_nightwalker:mastery": { feature: "Fleeting Shadow", evasion: 1 },
+  "subclass_nightwalker:mastery": { feature: "Fleeting Shadow", evasion: 1 },
 
   // Winged Sentinel — "Gain a permanent +4 bonus to your Severe damage threshold."
-  "core_subclass_winged_sentinel:mastery": { feature: "Ascendant", severeThreshold: 4 },
+  "subclass_winged_sentinel:mastery": { feature: "Ascendant", severeThreshold: 4 },
 
   // School of Knowledge — "Take an additional domain card of your level or lower from a domain
   // you have access to." Not a stat, but it changes how many cards you get to pick.
-  "core_subclass_school_of_knowledge:foundation": { feature: "Prepared", extraDomainCards: 1 },
-  "core_subclass_school_of_knowledge:specialization": { feature: "Accomplished", extraDomainCards: 1 },
-  "core_subclass_school_of_knowledge:mastery": { feature: "Brilliant", extraDomainCards: 1 },
+  "subclass_school_of_knowledge:foundation": { feature: "Prepared", extraDomainCards: 1 },
+  "subclass_school_of_knowledge:specialization": { feature: "Accomplished", extraDomainCards: 1 },
+  "subclass_school_of_knowledge:mastery": { feature: "Brilliant", extraDomainCards: 1 },
 
   // ===================== Armor features =====================
 
@@ -194,23 +227,23 @@ export const EFFECTS = {
   // Barrier and Protective mean a different number on each shield, so these are keyed per item
   // and override the generic feature-name entries above.
   // "+N to Armor Score; -1 to Evasion"
-  "core_weapon_tower_shield:Barrier": { armorScore: 2, evasion: -1 },
-  "core_weapon_improved_tower_shield:Barrier": { armorScore: 3, evasion: -1 },
-  "core_weapon_advanced_tower_shield:Barrier": { armorScore: 4, evasion: -1 },
-  "core_weapon_legendary_tower_shield:Barrier": { armorScore: 5, evasion: -1 },
+  "weapon_tower_shield:Barrier": { armorScore: 2, evasion: -1 },
+  "weapon_improved_tower_shield:Barrier": { armorScore: 3, evasion: -1 },
+  "weapon_advanced_tower_shield:Barrier": { armorScore: 4, evasion: -1 },
+  "weapon_legendary_tower_shield:Barrier": { armorScore: 5, evasion: -1 },
   // "+N to Armor Score"
-  "core_weapon_round_shield:Protective": { armorScore: 1 },
-  "core_weapon_labrys_axe:Protective": { armorScore: 1 },
-  "core_weapon_improved_round_shield:Protective": { armorScore: 2 },
-  "core_weapon_advanced_round_shield:Protective": { armorScore: 3 },
-  "core_weapon_legendary_round_shield:Protective": { armorScore: 4 },
+  "weapon_round_shield:Protective": { armorScore: 1 },
+  "weapon_labrys_axe:Protective": { armorScore: 1 },
+  "weapon_improved_round_shield:Protective": { armorScore: 2 },
+  "weapon_advanced_round_shield:Protective": { armorScore: 3 },
+  "weapon_legendary_round_shield:Protective": { armorScore: 4 },
 
   // ===================== Domain cards =====================
 
   // Untouchable — "Gain a bonus to your Evasion equal to half your Agility."
   // The SRD's general rule: "if you need to round to a whole number, round up unless otherwise
   // specified", so Agility +1 gives +1, not 0.
-  "core_domain_card_untouchable": { evasion: (c) => Math.ceil(c.traits.agility / 2) },
+  "domain_card_untouchable": { evasion: (c) => Math.ceil(c.traits.agility / 2) },
 
   // Bare Bones — "When you choose not to equip armor, you have a base Armor Score of 3 + your
   // Strength and use the following as your base damage thresholds: Tier 1: 9/19, Tier 2: 11/24,
@@ -219,7 +252,7 @@ export const EFFECTS = {
   // Base, not bonus: it stands in for the armor you're not wearing, so your level is added on
   // top of those thresholds exactly as it would be on top of a breastplate's. Choosing not to
   // equip armor is a configuration rather than an action, so it counts.
-  "core_domain_card_bare_bones": {
+  "domain_card_bare_bones": {
     when: (c) => !c.armor,
     base: {
       armorScore: (c) => 3 + c.traits.strength,
@@ -230,27 +263,27 @@ export const EFFECTS = {
 
   // Fortified Armor — "While you are wearing armor, gain a +2 bonus to your damage thresholds."
   // Wearing armor is a configuration, not an action, so this counts.
-  "core_domain_card_fortified_armor": {
+  "domain_card_fortified_armor": {
     when: (c) => !!c.armor,
     majorThreshold: 2,
     severeThreshold: 2,
   },
 
   // Armorer — "While you're wearing armor, gain a +1 bonus to your Armor Score."
-  "core_domain_card_armorer": {
+  "domain_card_armorer": {
     when: (c) => !!c.armor,
     armorScore: 1,
     excluded: [`Armorer's downtime armor repair for your allies ${ONCE_PER_REST}`],
   },
 
   // Rise Up — "Gain a bonus to your Severe threshold equal to your Proficiency."
-  "core_domain_card_rise_up": {
+  "domain_card_rise_up": {
     severeThreshold: (c) => c.proficiency,
     excluded: [`Rise Up's "clear a Stress when you mark Hit Points" happens in play, so it isn't counted here`],
   },
 
   // Arcana-Touched — "+1 bonus to your Spellcast Rolls".
-  "core_domain_card_arcana_touched": {
+  "domain_card_arcana_touched": {
     when: touched("ARCANA"),
     spellcast: 1,
     excluded: [`Arcana-Touched's Hope/Fear Die switch ${ONCE_PER_REST}`],
@@ -258,24 +291,24 @@ export const EFFECTS = {
 
   // Blade-Touched — "+2 bonus to your attack rolls" and "+4 bonus to your Severe damage
   // threshold". Both are passive, so nothing is excluded.
-  "core_domain_card_blade_touched": { when: touched("BLADE"), attack: 2, severeThreshold: 4 },
+  "domain_card_blade_touched": { when: touched("BLADE"), attack: 2, severeThreshold: 4 },
 
   // Bone-Touched — "+1 bonus to Agility".
-  "core_domain_card_bone_touched": {
+  "domain_card_bone_touched": {
     when: touched("BONE"),
     traits: { agility: 1 },
     excluded: [`Bone-Touched's attack negation costs 3 Hope, so it isn't counted here`],
   },
 
   // Splendor-Touched — "+3 bonus to your Severe damage threshold".
-  "core_domain_card_splendor_touched": {
+  "domain_card_splendor_touched": {
     when: touched("SPLENDOR"),
     severeThreshold: 3,
     excluded: [`Splendor-Touched's damage substitution ${ONCE_PER_REST}`],
   },
 
   // Valor-Touched — "+1 bonus to your Armor Score".
-  "core_domain_card_valor_touched": {
+  "domain_card_valor_touched": {
     when: touched("VALOR"),
     armorScore: 1,
     excluded: [`Valor-Touched's Armor Slot recovery happens in play, so it isn't counted here`],
@@ -283,7 +316,7 @@ export const EFFECTS = {
 
   // Codex-Touched — catalogued so a player who met the requirement is told why nothing moved.
   // Adding Proficiency to a Spellcast Roll costs a Stress; the card swap is once per rest.
-  "core_domain_card_codex_touched": {
+  "domain_card_codex_touched": {
     when: touched("CODEX"),
     excluded: [
       `Codex-Touched's Proficiency on Spellcast Rolls costs a Stress each time, so it isn't counted here`,
@@ -292,7 +325,7 @@ export const EFFECTS = {
   },
 
   // Sage-Touched — the Spellcast bonus depends on where the scene is set, which we don't track.
-  "core_domain_card_sage_touched": {
+  "domain_card_sage_touched": {
     when: touched("SAGE"),
     excluded: [
       `Sage-Touched's +2 to Spellcast Rolls only applies in a natural environment, so it isn't counted here`,
@@ -303,7 +336,7 @@ export const EFFECTS = {
   // Vitality — "When you choose this card, permanently gain two of the following benefits...
   // Then place this card in your vault permanently." Permanent, so it keeps applying from the
   // vault — which is exactly where the card tells you to put it.
-  "core_domain_card_vitality": {
+  "domain_card_vitality": {
     permanent: true,
     choice: {
       prompt: "Vitality: choose two benefits. They're permanent, and stay even though the card lives in your vault.",
@@ -319,7 +352,7 @@ export const EFFECTS = {
 
   // Master of the Craft — "Gain a permanent +2 bonus to two of your Experiences or a permanent
   // +3 bonus to one of your Experiences. Then place this card in your vault permanently."
-  "core_domain_card_master_of_the_craft": {
+  "domain_card_master_of_the_craft": {
     permanent: true,
     choice: {
       prompt: "Master of the Craft: choose how to spend the bonus. It's permanent, and stays even though the card lives in your vault.",
@@ -340,11 +373,31 @@ export const EFFECT_STAT_KEYS = [
   "armorScore", "attack", "spellcast", "extraDomainCards",
 ];
 
-function lookup(...keys) {
+// A content source may declare its own effects, and they arrive on `db.effects` — never merged
+// into EFFECTS above, which stays exactly the hand-audited catalogue this file documents.
+//
+// A source's entry WINS over one here, because a source that revises a record is revising what
+// that record does: a reprint of a card is the new version of it. An override that declares
+// nothing INHERITS the entry here — including the functions and choices JSON can't express — and
+// the "?" breakdown labels it with the overriding record's own name, so the attribution stays
+// honest either way.
+function lookup(db, ...keys) {
+  const source = db?.effects;
   for (const key of keys) {
-    if (Object.prototype.hasOwnProperty.call(EFFECTS, key)) return { key, effect: EFFECTS[key] };
+    for (const form of bareForms(key, db?.sourceNames)) {
+      // `key`, not `form`: the caller stores a player's answer to a choice under what comes back
+      // (`ch.effectChoices[key]`), and that answer belongs to the CARD the player put in their
+      // loadout. Which spelling of the catalogue happened to match is this function's business.
+      if (source && Object.prototype.hasOwnProperty.call(source, form)) return { key, effect: source[form] };
+      if (Object.prototype.hasOwnProperty.call(EFFECTS, form)) return { key, effect: EFFECTS[form] };
+    }
   }
   return null;
+}
+
+/** The effect behind a key, source overlay included. For the two places that read one directly. */
+export function effectFor(db, ...keys) {
+  return lookup(db, ...keys)?.effect || null;
 }
 
 function featureNames(entity) {
@@ -367,7 +420,8 @@ function tiersUpTo(tier) {
  * Each entry is { key, label, effect, source, scope }:
  *  - `label` is what the "?" breakdown shows, so it names the thing the player chose rather
  *    than the rule id.
- *  - `source` is where it came from: "ancestry", "subclass", "armor", "weapon" or "domainCard".
+ *  - `source` is where it came from: "ancestry", "transformation", "subclass", "armor", "weapon"
+ *    or "domainCard".
  *    Pages use it to decide WHERE a choice gets asked, so that a new card with a choice lands
  *    on the level up screen and a new ancestry feature with one lands in the wizard, both
  *    without either page learning its name.
@@ -386,14 +440,26 @@ export function collectEffects(ch, db) {
 
   for (const chosen of ch.heritage?.chosenFeatures || []) {
     const anc = (db?.ancestries || []).find((a) => a.id === chosen.ancestryId);
-    add(lookup(`${chosen.ancestryId}:${chosen.featureName}`), "ancestry",
+    add(lookup(db, `${chosen.ancestryId}:${chosen.featureName}`), "ancestry",
       `${displayName(anc, "Ancestry")} — ${chosen.featureName}`);
+  }
+
+  // A transformation reads next, because the rules place it with the heritage: "add the card to
+  // your loadout as if it were part of your character's heritage". Keyed per FEATURE, like an
+  // ancestry rather than like a domain card — a transformation's features are a benefit and a
+  // drawback, and each may want its own entry or its own `excluded` note. Both always apply;
+  // unlike a mixed ancestry there is nothing to choose between them, and unlike a domain card
+  // there is no vault to take one out of.
+  const transformation = (db?.transformations || []).find((t) => t.id === ch.transformationId);
+  for (const name of featureNames(transformation)) {
+    add(lookup(db, `${transformation.id}:${name}`), "transformation",
+      `${displayName(transformation, "Transformation")} — ${name}`);
   }
 
   const sub = (db?.subclasses || []).find((s) => s.id === ch.subclassId);
   if (sub) {
     for (const tier of tiersUpTo(ch.subclassTier)) {
-      const hit = lookup(`${sub.id}:${tier}`);
+      const hit = lookup(db, `${sub.id}:${tier}`);
       // The feature name comes from the entry, not from data/: a tier can hold two features
       // and only one of them is the one being encoded (Stalwart's Foundation is Unwavering
       // AND Iron Will; only Unwavering moves a stat).
@@ -407,7 +473,7 @@ export function collectEffects(ch, db) {
     ? undefined
     : (db?.armors || []).find((a) => a.id === ch.equipment?.armorId);
   for (const name of featureNames(armor)) {
-    add(lookup(`${armor.id}:${name}`, `armor:${name}`), "armor", `${displayName(armor, "Armor")} (${name})`);
+    add(lookup(db, `${armor.id}:${name}`, `armor:${name}`), "armor", `${displayName(armor, "Armor")} (${name})`);
   }
 
   // Both slots, always: what's equipped is what applies. See derived-stats.js for why the old
@@ -421,7 +487,7 @@ export function collectEffects(ch, db) {
   for (const [scope, weaponId] of weaponSlots) {
     const weapon = (db?.weapons || []).find((w) => w.id === weaponId);
     for (const name of featureNames(weapon)) {
-      add(lookup(`${weapon.id}:${name}`, `weapon:${name}`), "weapon", `${displayName(weapon, "Weapon")} (${name})`, scope);
+      add(lookup(db, `${weapon.id}:${name}`, `weapon:${name}`), "weapon", `${displayName(weapon, "Weapon")} (${name})`, scope);
     }
   }
 
@@ -429,7 +495,7 @@ export function collectEffects(ch, db) {
   // permanent keeps applying from the vault, which is where those cards tell you to put them.
   const vaulted = ch.domainVaultIds || [];
   for (const cardId of ch.domainCardIds || []) {
-    const hit = lookup(cardId);
+    const hit = lookup(db, cardId);
     if (!hit) continue;
     if (vaulted.includes(cardId) && !hit.effect.permanent) continue;
     const card = (db?.domainCards || []).find((c) => c.id === cardId);
@@ -440,8 +506,8 @@ export function collectEffects(ch, db) {
 }
 
 /** The choice a source asks for, if it asks for one at all. */
-export function choiceFor(key) {
-  return EFFECTS[key]?.choice || null;
+export function choiceFor(key, db) {
+  return effectFor(db, key)?.choice || null;
 }
 
 // How many of each domain are in the loadout — the requirement the *-Touched cards check.

@@ -126,6 +126,9 @@ export function deriveSheet(character, db) {
   const unarmored = character.equipment?.armorId === UNARMORED;
   const armor = unarmored ? null : find(db?.armors, character.equipment?.armorId);
   const community = find(db?.communities, character.heritage.communityId);
+  // Optional, and null for most characters. Read off a top-level field rather than out of
+  // `heritage`, though it prints beside it: heritage's shape is ancestry-specific.
+  const transformation = find(db?.transformations, character.transformationId);
   const ancestries = character.heritage.ancestryIds.map((id) => find(db?.ancestries, id)).filter(Boolean);
 
   // Fighting unarmed is a choice with rules of its own — [Proficiency]d4, Strength or Finesse —
@@ -166,6 +169,9 @@ export function deriveSheet(character, db) {
     subclassTierLabel: SUBCLASS_TIER_LABELS[character.subclassTier] || "",
     ancestryNames: ancestries.map((a) => a.name["en-US"]),
     communityName: community ? community.name["en-US"] : "—",
+    // null rather than "—": a character without one has nothing missing, so the sheet leaves it
+    // out entirely instead of printing a dash for a slot that was never theirs to fill.
+    transformationName: transformation ? transformation.name["en-US"] : null,
 
     // Effective traits — assigned value plus whatever armor, weapons, ancestry and cards add —
     // because that's the number rolled at the table. Printing the raw assignment (the old bug)
@@ -247,6 +253,12 @@ export function deriveSheet(character, db) {
     }),
     communityFeatures: features(community?.features).map((f) => ({
       ...f, source: community ? community.name["en-US"] : "",
+    })),
+    // Both features, always — a transformation's drawback is not optional, and one the player
+    // forgets is one that never happens at the table. Nothing is chosen between them, so unlike
+    // ancestryFeatures above there's no filter here.
+    transformationFeatures: features(transformation?.features).map((f) => ({
+      ...f, source: transformation ? transformation.name["en-US"] : "",
     })),
 
     // A card like Vitality grants nothing until its choice is answered (see effects.js). A

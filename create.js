@@ -4,12 +4,17 @@ import {
   subclassCardArtPath,
   communityCardArtPath,
   ancestryCardArtPath,
+  transformationCardArtPath,
 } from "./shared/card-render.js";
 import { blankSlotsUsed, ensureLevelFields, tierForLevel } from "./shared/advancement.js";
 import { recomputeCharacter } from "./shared/history.js";
 import { derivedStats } from "./shared/derived-stats.js";
 import { statLine } from "./shared/stat-line.js";
-import { EFFECTS, blankAnswer, collectEffects, ignoresBurden } from "./shared/effects.js";
+import { blankAnswer, collectEffects, effectFor, ignoresBurden } from "./shared/effects.js";
+import { loadContent } from "./shared/content-load.js";
+import { remapCharacterIds, resolveRecordId } from "./shared/content-ids.js";
+import { mountContentSettings } from "./shared/content-settings.js";
+import { visibleRecords } from "./shared/content-sources.js";
 import { renderEffectChoice } from "./shared/effect-choice.js";
 import { CHOOSE_KEYS, nextIndex, tabStopIndex } from "./shared/choice-keys.js";
 import {
@@ -31,10 +36,14 @@ const TRAIT_KEYS = ["agility", "strength", "finesse", "instinct", "presence", "k
 const TRAIT_LABELS = { agility: "Agility", strength: "Strength", finesse: "Finesse", instinct: "Instinct", presence: "Presence", knowledge: "Knowledge" };
 
 const TRAIT_ARRAY = [2, 1, 1, 0, 0, -1];
-const MINOR_HEALTH_POTION_ID = "core_consumable_minor_health_potion";
-const MINOR_STAMINA_POTION_ID = "core_consumable_minor_stamina_potion";
+// The two potions the SRD hands every new character. Named here rather than read from a record,
+// because the choice between them is a rule, not data — but the id has to be the one the loaded
+// edition actually published, so these are the BARE forms and resolveRecordId() finds the rest.
+const MINOR_HEALTH_POTION = "consumable_minor_health_potion";
+const MINOR_STAMINA_POTION = "consumable_minor_stamina_potion";
 
-const STEPS = [
+// The steps every character has. The optional one is spliced in by buildSteps() below.
+const BASE_STEPS = [
   { key: "class", label: "Class" },
   { key: "heritage", label: "Ancestry & Community" },
   { key: "traits", label: "Traits" },
@@ -46,6 +55,8 @@ const STEPS = [
   { key: "connections", label: "Connections" },
 ];
 
+let STEPS = BASE_STEPS; // the steps this character actually has — see buildSteps()
+
 const db = {}; // populated by loadAllData(): classes, subclasses, ancestries, communities, domainCards, weapons, armors, consumables
 let character = null;
 let currentStep = 0;
@@ -55,24 +66,26 @@ function titleCase(str) {
   return str.charAt(0) + str.slice(1).toLowerCase();
 }
 
-async function loadJson(name) {
-  const res = await fetch(`data/${name}.json`);
-  return res.json();
-}
+// What loadContent() reported: which sources loaded, and which of them are switched off.
+let content = null;
 
 async function loadAllData() {
-  const [classes, subclasses, ancestries, communities, domainCards, weapons, armors, consumables] = await Promise.all([
-    loadJson("classes"), loadJson("subclasses"), loadJson("ancestries"), loadJson("communities"),
-    loadJson("domain-cards"), loadJson("weapons"), loadJson("armors"), loadJson("consumables"),
-  ]);
-  db.classes = classes;
-  db.subclasses = subclasses;
-  db.ancestries = ancestries;
-  db.communities = communities;
-  db.domainCards = domainCards;
-  db.weapons = weapons;
-  db.armors = armors;
-  db.consumables = consumables;
+  content = await loadContent();
+  Object.assign(db, content.db);
+}
+
+// What a picker may OFFER. Everything loaded stays in `db` and stays findable by id — switching a
+// source off must never put a hole in a character already built with it — so the toggles reach
+// exactly these lists and nothing else.
+const pickable = (list) => visibleRecords(list, content.disabled);
+
+// Every source can be switched off, the SRD included, so a picker can genuinely come up empty.
+// Without this the step renders a bare heading with nothing under it and no explanation.
+function emptyPickerNote(container, what) {
+  const p = document.createElement("p");
+  p.className = "hint";
+  p.textContent = `No ${what} to choose from — every content source that provides them is switched off. Open Content in the top bar to turn one back on.`;
+  container.appendChild(p);
 }
 
 function loadAllCharacters() {
@@ -104,6 +117,10 @@ function blankCharacter(id) {
     classId: null,
     subclassId: null,
     heritage: { ancestryMode: "pure", ancestryIds: [], chosenFeatures: [], communityId: null },
+    // At most one, and usually none: a transformation is optional and a GM hands it out. It
+    // doesn't live in `heritage` — that field's shape is ancestry-specific — nor in
+    // domainCardIds, because a transformation card doesn't count against the loadout limit.
+    transformationId: null,
     traits: { agility: null, strength: null, finesse: null, instinct: null, presence: null, knowledge: null },
     // No weaponMode: what's equipped is the truth. Older saves still carry the field;
     // nothing reads it, so there's nothing to migrate.
@@ -129,15 +146,49 @@ function blankCharacter(id) {
   };
 }
 
+// Which steps this character has. Everything in BASE_STEPS, plus the optional transformation step
+// when there is anything to say about it — a source that provides transformations, or a character
+// that already has one.
+//
+// The second half matters as much as the first: switching off the source a character's
+// transformation came from must not strand them with a choice they can no longer reach and clear.
+// Runs after the character is loaded, for that reason.
+function buildSteps() {
+  const relevant = (db.transformations || []).length > 0 || !!character.transformationId;
+  if (!relevant) {
+    STEPS = BASE_STEPS;
+    return;
+  }
+  STEPS = [...BASE_STEPS];
+  // Straight after the heritage, which is where the rules put it.
+  STEPS.splice(BASE_STEPS.findIndex((s) => s.key === "heritage") + 1, 0,
+    { key: "transformation", label: "Transformation" });
+}
+
+// The equipment step outlives creation, so the sheet links straight to it, and so does the
+// "Change transformation" link on the roster. Any step key works; an unknown one just starts at
+// the beginning, as a bare ?id= always has.
+//
+// The key is read BEFORE initCharacter() and applied after buildSteps(), which is a two-sided
+// constraint rather than fussiness: a brand-new character has no id yet, so initCharacter()
+// rewrites the URL with history.replaceState() and `?step=` is gone by the time it returns —
+// while the step being named may be one buildSteps() has yet to splice in.
+function stepParam() {
+  return new URLSearchParams(location.search).get("step");
+}
+
+function applyStepParam(key) {
+  const step = STEPS.findIndex((s) => s.key === key);
+  if (step >= 0) currentStep = step;
+}
+
 function initCharacter() {
   const params = new URLSearchParams(location.search);
   const id = params.get("id");
-  // The equipment step outlives creation, so the sheet links straight to it. Any step key works;
-  // an unknown one just starts at the beginning, as a bare ?id= always has.
-  const step = STEPS.findIndex((s) => s.key === params.get("step"));
-  if (step >= 0) currentStep = step;
   if (id) {
-    const found = loadAllCharacters().find((c) => c.id === id);
+    // These pages can be opened straight from a URL, so they can't rely on the roster having
+    // been through this already. Returns the character untouched when nothing needed moving.
+    const found = remapCharacterIds(loadAllCharacters().find((c) => c.id === id), db);
     if (found) {
       character = ensureLevelFields(found);
       // Coming back to change one thing isn't creating a character, and the page shouldn't
@@ -170,6 +221,10 @@ function isStepValid(stepKey) {
   switch (stepKey) {
     case "class":
       return !!character.classId && !!character.subclassId;
+    case "transformation":
+      // Optional, so always satisfied. Having none is a complete answer, and the rules say so:
+      // a GM hands these out, they aren't part of building a character.
+      return true;
     case "heritage": {
       const h = character.heritage;
       if (!h.communityId) return false;
@@ -243,6 +298,7 @@ function renderStepPanel() {
   const renderers = {
     class: renderClassStep,
     heritage: renderHeritageStep,
+    transformation: renderTransformationStep,
     traits: renderTraitsStep,
     derived: renderDerivedStep,
     equipment: renderEquipmentStep,
@@ -397,7 +453,9 @@ function renderClassStep(panel) {
 
   const classGrid = document.createElement("div");
   classGrid.className = "tile-grid";
-  for (const cls of db.classes) {
+  const classes = pickable(db.classes);
+  if (classes.length === 0) emptyPickerNote(panel, "classes");
+  for (const cls of classes) {
     const tile = document.createElement("div");
     tile.className = "class-tile" + (character.classId === cls.id ? " selected" : "");
     tile.dataset.choice = cls.id;
@@ -437,10 +495,10 @@ function renderClassStep(panel) {
 
     const subGrid = document.createElement("div");
     subGrid.className = "tile-grid";
-    const subsForClass = db.subclasses.filter((s) => s.class === classNameKey(cls));
+    const subsForClass = pickable(db.subclasses).filter((s) => s.class === classNameKey(cls));
     for (const sub of subsForClass) {
       const card = {
-        id: sub.id, name: sub.name["en-US"], art: subclassCardArtPath(sub.id, "foundation"),
+        id: sub.id, name: sub.name["en-US"], art: subclassCardArtPath(sub, "foundation"),
         type: "Subclass", features: sub.foundation?.features,
       };
       const tile = cardTile(card, character.subclassId === sub.id, () => {
@@ -485,8 +543,10 @@ function renderHeritageStep(panel) {
 
   const ancGrid = document.createElement("div");
   ancGrid.className = "tile-grid";
-  for (const anc of db.ancestries) {
-    const card = { id: anc.id, name: anc.name["en-US"], art: ancestryCardArtPath(anc.id), type: "Ancestry", features: anc.features };
+  const ancestries = pickable(db.ancestries);
+  if (ancestries.length === 0) emptyPickerNote(panel, "ancestries");
+  for (const anc of ancestries) {
+    const card = { id: anc.id, name: anc.name["en-US"], art: ancestryCardArtPath(anc), type: "Ancestry", features: anc.features };
     const selected = h.ancestryIds.includes(anc.id);
     const tile = cardTile(card, selected, () => {
       if (h.ancestryMode === "pure") {
@@ -550,8 +610,10 @@ function renderHeritageStep(panel) {
   panel.appendChild(h3c);
   const comGrid = document.createElement("div");
   comGrid.className = "tile-grid";
-  for (const com of db.communities) {
-    const card = { id: com.id, name: com.name["en-US"], art: communityCardArtPath(com.id), type: "Community", features: com.features };
+  const communities = pickable(db.communities);
+  if (communities.length === 0) emptyPickerNote(panel, "communities");
+  for (const com of communities) {
+    const card = { id: com.id, name: com.name["en-US"], art: communityCardArtPath(com), type: "Community", features: com.features };
     const tile = cardTile(card, h.communityId === com.id, () => {
       h.communityId = com.id;
       onChange();
@@ -560,6 +622,83 @@ function renderHeritageStep(panel) {
   }
   panel.appendChild(comGrid);
   makeGridChoosable(comGrid, { key: "community", label: "Community" });
+}
+
+// --- Optional step: Transformation ---
+//
+// A transformation is a permanent change to what a character IS. It's optional, a GM usually hands
+// one out mid-campaign, and a character can have only one — which is why the character stores a
+// single id rather than a list: the rule isn't enforced anywhere, it just has no shape to be
+// broken in.
+//
+// The step is absent unless something provides transformations, so switching SRD 2.0 off (or
+// loading only SRD 1.0, which has none) removes it rather than showing an empty picker.
+// See buildSteps().
+function renderTransformationStep(panel) {
+  const info = document.createElement("p");
+  info.className = "hint";
+  info.textContent = "Optional, and you can have only one. A transformation gives you a benefit " +
+    "and a drawback together, and the card doesn't count against your loadout — it sits with your " +
+    "heritage. Your GM may hand you one during play instead, and you can come back here for it.";
+  panel.appendChild(info);
+
+  const transformations = pickable(db.transformations);
+  if (transformations.length === 0) {
+    emptyPickerNote(panel, "transformations");
+    // Not a dead end: a character whose source was switched off still needs a way to clear it.
+    if (character.transformationId) panel.appendChild(clearTransformationRow());
+    return;
+  }
+
+  panel.appendChild(clearTransformationRow());
+
+  const grid = document.createElement("div");
+  grid.className = "tile-grid";
+  for (const t of transformations) {
+    const card = {
+      id: t.id, name: t.name["en-US"], art: transformationCardArtPath(t),
+      type: "Transformation", features: t.features,
+    };
+    const selected = character.transformationId === t.id;
+    // Clicking the one you already have clears it, so the card is a toggle and you're never
+    // stuck with a choice you can't undo from the grid itself.
+    grid.appendChild(cardTile(card, selected, () => {
+      character.transformationId = selected ? null : t.id;
+      onChange();
+    }));
+  }
+  panel.appendChild(grid);
+
+  renderTransformationChoices(panel);
+}
+
+function clearTransformationRow() {
+  const row = document.createElement("label");
+  row.className = "option-row";
+  row.innerHTML = `<input type="radio" name="transformation-none" ` +
+    `${character.transformationId ? "" : "checked"}/> <strong>No transformation</strong>`;
+  row.querySelector("input").addEventListener("change", () => {
+    character.transformationId = null;
+    onChange();
+  });
+  return row;
+}
+
+// A transformation that says "choose" gets asked here, beside the card that asked it — the same
+// principle that puts an ancestry's choice in the wizard and a card's on the level up screen.
+// Nothing here knows which transformation that is, or what it asks for.
+function renderTransformationChoices(panel) {
+  for (const entry of collectEffects(character, db)) {
+    if (entry.source !== "transformation" || !entry.effect.choice) continue;
+    const answer = (character.effectChoices[entry.key] ||= blankAnswer());
+    renderEffectChoice(panel, {
+      key: entry.key,
+      choice: entry.effect.choice,
+      answer,
+      experiences: character.experiences,
+      onChange,
+    });
+  }
 }
 
 // --- Step 3: Traits ---
@@ -681,6 +820,10 @@ function renderEquipmentStep(panel) {
   const e = character.equipment;
   const spellcastTrait = selectedSubclass()?.spellcastTrait ?? null;
   const tier = tierForLevel(character.level);
+  // Whichever loaded edition published each potion. Falling back to the bare form keeps the radio
+  // working even if no edition has one, rather than rendering two buttons with empty values.
+  const healthPotionId = resolveRecordId(MINOR_HEALTH_POTION, db) || MINOR_HEALTH_POTION;
+  const staminaPotionId = resolveRecordId(MINOR_STAMINA_POTION, db) || MINOR_STAMINA_POTION;
 
   const h3a = document.createElement("h3");
   h3a.textContent = "Primary weapon";
@@ -688,7 +831,7 @@ function renderEquipmentStep(panel) {
 
   // The primary list is the long one — 43 or 44 weapons in each of the upper tiers, against ten
   // or fewer for the other two lists, which is why only this one is worth filtering.
-  const primaries = db.weapons.filter((w) => w.type !== "SECONDARY");
+  const primaries = pickable(db.weapons).filter((w) => w.type !== "SECONDARY");
   const search = document.createElement("input");
   search.type = "search";
   search.className = "gear-filter";
@@ -724,7 +867,7 @@ function renderEquipmentStep(panel) {
   const h3b = document.createElement("h3");
   h3b.textContent = "Secondary weapon";
   panel.appendChild(h3b);
-  panel.appendChild(gearList(db.weapons.filter((w) => w.type === "SECONDARY"), {
+  panel.appendChild(gearList(pickable(db.weapons).filter((w) => w.type === "SECONDARY"), {
     groupName: "weapon-secondary",
     selectedId: e.secondaryWeaponId,
     onSelect: (id) => { e.secondaryWeaponId = id; onChange(); },
@@ -751,7 +894,7 @@ function renderEquipmentStep(panel) {
   const h3c = document.createElement("h3");
   h3c.textContent = "Armor";
   panel.appendChild(h3c);
-  panel.appendChild(gearList(db.armors, {
+  panel.appendChild(gearList(pickable(db.armors), {
     groupName: "armor",
     selectedId: e.armorId,
     onSelect: (id) => { e.armorId = id; onChange(); },
@@ -768,8 +911,8 @@ function renderEquipmentStep(panel) {
   const potionRow = document.createElement("div");
   potionRow.className = "field-row";
   potionRow.innerHTML = `
-    <label><input type="radio" name="potion" value="${MINOR_HEALTH_POTION_ID}" ${e.potionChoice === MINOR_HEALTH_POTION_ID ? "checked" : ""}/> Minor Health Potion</label>
-    <label><input type="radio" name="potion" value="${MINOR_STAMINA_POTION_ID}" ${e.potionChoice === MINOR_STAMINA_POTION_ID ? "checked" : ""}/> Minor Stamina Potion</label>
+    <label><input type="radio" name="potion" value="${healthPotionId}" ${e.potionChoice === healthPotionId ? "checked" : ""}/> Minor Health Potion</label>
+    <label><input type="radio" name="potion" value="${staminaPotionId}" ${e.potionChoice === staminaPotionId ? "checked" : ""}/> Minor Stamina Potion</label>
   `;
   potionRow.querySelectorAll('input[name="potion"]').forEach((r) => {
     r.addEventListener("change", (ev) => { e.potionChoice = ev.target.value; onChange(); });
@@ -916,11 +1059,12 @@ function renderDomainCardsStep(panel) {
     (count > 2 ? " Your subclass grants one more than the usual 2." : "");
   panel.appendChild(info);
 
-  const available = db.domainCards.filter((c) => c.level === 1 && cls.domains.includes(c.domain));
+  const available = pickable(db.domainCards).filter((c) => c.level === 1 && cls.domains.includes(c.domain));
+  if (available.length === 0) emptyPickerNote(panel, "level 1 cards in this class's domains");
   const grid = document.createElement("div");
   grid.className = "tile-grid";
   for (const c of available) {
-    const card = { id: c.id, name: c.name["en-US"], art: domainCardArtPath(c.id), level: c.level, type: c.type, features: c.features };
+    const card = { id: c.id, name: c.name["en-US"], art: domainCardArtPath(c), level: c.level, type: c.type, features: c.features };
     const selected = character.creationDomainCardIds.includes(c.id);
     const tile = cardTile(card, selected, () => {
       if (selected) {
@@ -942,7 +1086,7 @@ function renderDomainCardsStep(panel) {
 // character holds at creation, and the Specialization and Mastery ones arrive with the subclass
 // upgrades at level up.
 function creationCardCount() {
-  return 2 + (EFFECTS[`${character.subclassId}:foundation`]?.extraDomainCards || 0);
+  return 2 + (effectFor(db, `${character.subclassId}:foundation`)?.extraDomainCards || 0);
 }
 
 // The 2 starting cards are only part of the collection once a character has levelled up,
@@ -980,7 +1124,12 @@ function renderAll() {
 
 async function init() {
   await loadAllData();
+  mountContentSettings(content);
+  const step = stepParam(); // before initCharacter(): see stepParam()
   initCharacter();
+  // After the character exists, because which steps there are can depend on it.
+  buildSteps();
+  applyStepParam(step);
   document.getElementById("prev-btn").addEventListener("click", () => goToStep(Math.max(0, currentStep - 1)));
   document.getElementById("next-btn").addEventListener("click", () => goToStep(Math.min(STEPS.length - 1, currentStep + 1)));
   document.getElementById("finish-btn").addEventListener("click", () => {

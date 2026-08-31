@@ -132,6 +132,16 @@ const {
   tabStopIndex,
 } = await import(`../shared/choice-keys.js${RUN}`);
 
+const { collectEffects } = await import(`../shared/effects.js${RUN}`);
+
+const {
+  bareForms,
+  bareId,
+  indexRecordIds,
+  remapCharacterIds,
+  resolveRecordId,
+} = await import(`../shared/content-ids.js${RUN}`);
+
 // ---------- tiny runner ----------
 
 const groups = [];
@@ -1276,12 +1286,12 @@ group("A subclass upgrade that grants a domain card actually hands one over");
 
 group("Answers are only complete when they pick everything asked for");
 {
-  const vitality = EFFECTS["core_domain_card_vitality"].choice;
+  const vitality = EFFECTS["domain_card_vitality"].choice;
   eq("a blank answer isn't an answer", isAnswered(vitality, blankAnswer()), false);
   eq("one of two isn't either", isAnswered(vitality, { optionIds: ["stress"] }), false);
   eq("two of two is", isAnswered(vitality, { optionIds: ["stress", "hitPoint"] }), true);
 
-  const motc = EFFECTS["core_domain_card_master_of_the_craft"].choice;
+  const motc = EFFECTS["domain_card_master_of_the_craft"].choice;
   eq("+3 to one needs one Experience named",
     isAnswered(motc, { optionId: "one", experienceIds: ["e1"] }), true);
   eq("+2 to two needs two", isAnswered(motc, { optionId: "two", experienceIds: ["e1"] }), false);
@@ -1291,32 +1301,48 @@ group("Every id in effects.js still exists in data/");
 {
   // The one group that reads data/ for real. An upstream refresh that renames an id would
   // otherwise drop an effect silently: no error, just a number that quietly stops being right.
-  const load = async (name) => (await fetch(`../data/${name}.json${RUN}`)).json();
-  const [ancestries, subclasses, armors, weapons, cards, classes] = await Promise.all(
-    ["ancestries", "subclasses", "armors", "weapons", "domain-cards", "classes"].map(load));
+  // Both editions, because an entry here is keyed WITHOUT a document prefix precisely so that one
+  // entry serves whichever edition printed the card. A key only has to resolve in one of them —
+  // SRD 2.0 dropped records SRD 1.0 has, and vice versa.
+  const EDITIONS = ["srd_1_0", "srd_2_0"];
+  const load = async (edition, name) => (await fetch(`../data/${edition}/${name}.json${RUN}`)).json();
+  const files = ["ancestries", "subclasses", "armors", "weapons", "domain-cards", "classes"];
+  // Only SRD 2.0 publishes transformations, so this one is loaded on its own rather than per
+  // edition — asking SRD 1.0 for a file it doesn't have would 404.
+  const loaded = await Promise.all(EDITIONS.map(async (e) =>
+    Object.fromEntries(await Promise.all(files.map(async (f) => [f, await load(e, f)])))));
+  const all = (f) => loaded.flatMap((d) => d[f]);
+  const classes = all("classes");
 
   // ignoresBurden() matches a class feature by name rather than by an EFFECTS key, so the check
   // below can't cover it. Renamed upstream, the Warrior would silently start getting a burden
   // warning the book says they're exempt from.
+  const warrior = classes.find((c) => c.name === "WARRIOR");
   check("the Warrior still has Combat Training to ignore burden with",
-    ignoresBurden({ classId: "core_class_warrior" }, { classes }));
+    ignoresBurden({ classId: warrior?.id }, { classes }));
 
+  // The same stripping lookup() does, so this group asks the question the app asks.
   const known = new Set();
+  const add = (key) => {
+    known.add(key);
+    for (const form of bareForms(key, EDITIONS)) known.add(form);
+  };
   const featureKeys = (list, prefix) => {
     for (const item of list) {
       for (const f of item.features || []) {
-        known.add(`${item.id}:${f.name["en-US"]}`);
-        known.add(`${prefix}:${f.name["en-US"]}`);
+        add(`${item.id}:${f.name["en-US"]}`);
+        add(`${prefix}:${f.name["en-US"]}`);
       }
     }
   };
-  featureKeys(ancestries, "ancestry");
-  featureKeys(armors, "armor");
-  featureKeys(weapons, "weapon");
-  for (const s of subclasses) for (const tier of ["foundation", "specialization", "mastery"]) {
-    if (s[tier]) known.add(`${s.id}:${tier}`);
+  featureKeys(await load("srd_2_0", "transformations"), "transformation");
+  featureKeys(all("ancestries"), "ancestry");
+  featureKeys(all("armors"), "armor");
+  featureKeys(all("weapons"), "weapon");
+  for (const sub of all("subclasses")) for (const tier of ["foundation", "specialization", "mastery"]) {
+    if (sub[tier]) add(`${sub.id}:${tier}`);
   }
-  for (const c of cards) known.add(c.id);
+  for (const c of all("domain-cards")) add(c.id);
 
   const missing = Object.keys(EFFECTS).filter((k) => !known.has(k));
   check(`all ${Object.keys(EFFECTS).length} effect keys resolve`, missing.length === 0,
@@ -1337,6 +1363,13 @@ group("Every id in effects.js still exists in data/");
 // fields, feature arrays with both `paragraph` and `list` description blocks, weapons with and
 // without a damage modifier.
 const SHEET_DB = {
+  transformations: [{
+    id: "tf", name: { "en-US": "Werewolf" },
+    features: [
+      { name: { "en-US": "Wolf Form" }, description: [{ paragraph: { "en-US": "A 1d10 bonus to attack and damage." } }] },
+      { name: { "en-US": "Howling Rampage" }, description: [{ paragraph: { "en-US": "Roll d20s equal to your tier." } }] },
+    ],
+  }],
   classes: [{
     id: "cls", name: "GUARDIAN", domains: ["VALOR", "BLADE"], startingHitPoints: 7, startingEvasion: 9,
     hopeFeature: { name: { "en-US": "Unstoppable" }, description: [{ paragraph: { "en-US": "Reduce incoming damage by one threshold." } }] },
@@ -1820,20 +1853,49 @@ group("JSON transfer: merging an import into the saved list, by id");
   eq("the whole list is named by date, like the CSV", exportFileName([a, b], stamp), `daggerheart-characters-${stamp}.json`);
 }
 
-group("Hope & Fear (the_void release of daggerheart-data) is in data/");
+group("The Hope & Fear content is the published SRD 2.0, not the playtest it was tested as");
 {
-  const load = async (name) => (await fetch(`../data/${name}.json${RUN}`)).json();
+  // The Void is Darrington Press's PLAYTEST imprint, and playtest text is revised before it
+  // reaches a book. The four classes below were shipped from that release, so their features were
+  // the pre-publication ones. These checks are what stops that happening again: each names a
+  // string that exists in SRD 2.0 and does NOT exist in the playtest.
+  const load = async (edition, name) => (await fetch(`../data/${edition}/${name}.json${RUN}`)).json();
   const [classes, subclasses, ancestries, communities, cards] = await Promise.all(
-    ["classes", "subclasses", "ancestries", "communities", "domain-cards"].map(load));
-  const voidClasses = classes.filter((c) => c.id.startsWith("the_void_class_"));
-  eq("the four classes", voidClasses.map((c) => c.name).sort(), ["ASSASSIN", "BRAWLER", "WARLOCK", "WITCH"]);
-  check("each of them has two subclasses keyed by class name, the way the wizard looks them up",
-    voidClasses.every((c) => subclasses.filter((s) => s.class === c.name).length === 2));
-  check("the 21 Dread domain cards, levels 1 to 10", cards.filter((c) => c.domain === "DREAD").length === 21);
-  check("the six ancestries and six communities",
-    ancestries.filter((a) => a.id.startsWith("the_void_")).length === 6 && communities.filter((a) => a.id.startsWith("the_void_")).length === 6);
-  check("no id collides with the core set", new Set(classes.map((c) => c.id)).size === classes.length && new Set(cards.map((c) => c.id)).size === cards.length);
-  check("the core set is still complete (9 classes, 189 cards)", classes.filter((c) => c.id.startsWith("core_")).length === 9 && cards.filter((c) => c.id.startsWith("core_")).length === 189);
+    ["classes", "subclasses", "ancestries", "communities", "domain-cards"].map((f) => load("srd_2_0", f)));
+  const byName = (n) => classes.find((c) => c.name === n);
+  const hope = (n) => byName(n)?.hopeFeature?.name?.["en-US"];
+  const features = (n) => (byName(n)?.classFeatures || []).map((f) => f.name["en-US"]);
+
+  eq("the four classes are here", ["ASSASSIN", "BRAWLER", "WARLOCK", "WITCH"].filter(byName).length, 4);
+  // The Brawler's is a mechanical change, not a rename: the playtest spent 3 Hope on a successful
+  // attack to Stagger; SRD 2.0 spends it to intimidate at Close range and make a target Vulnerable.
+  eq("the Brawler's Hope feature is Square Up, not the playtest's Staggering Strike",
+    hope("BRAWLER"), "Square Up");
+  eq("the Assassin's is Deadly Determination, not Grim Resolve",
+    hope("ASSASSIN"), "Deadly Determination");
+  check("the Warlock's class feature is Patron\u2019s Pact, not Warlock Patron",
+    features("WARLOCK").some((f) => f.includes("Pact")) && !features("WARLOCK").includes("Warlock Patron"));
+
+  check("each of the four has two subclasses keyed by class name, the way the wizard looks them up",
+    ["ASSASSIN", "BRAWLER", "WARLOCK", "WITCH"].every((n) => subclasses.filter((s) => s.class === n).length === 2));
+  check("the 21 Dread domain cards", cards.filter((c) => c.domain === "DREAD").length === 21);
+  eq("SRD 2.0 is one document: 13 classes, 210 cards", [classes.length, cards.length], [13, 210]);
+  check("and every id in it names the document it came from",
+    classes.every((c) => c.id.startsWith("srd_2_0_")) && cards.every((c) => c.id.startsWith("srd_2_0_")));
+  check("six more ancestries and six more communities than SRD 1.0",
+    ancestries.length === 24 && communities.length === 15);
+
+  // SRD 1.0 stays exactly what it was published as. Its value is that it doesn't move.
+  const [c1, d1, w1] = await Promise.all(["classes", "domain-cards", "weapons"].map((f) => load("srd_1_0", f)));
+  eq("SRD 1.0 is complete and unmixed: 9 classes, 189 cards", [c1.length, d1.length], [9, 189]);
+  check("with no Dread cards, because that domain wasn't published yet",
+    d1.every((c) => c.domain !== "DREAD"));
+  // The reason both editions are worth keeping on: 2.0 dropped weapons 1.0 has.
+  const bare = (id) => id.replace(/^srd_[12]_0_/, "");
+  const w2 = await load("srd_2_0", "weapons");
+  const onlyIn1 = w1.filter((w) => !new Set(w2.map((x) => bare(x.id))).has(bare(w.id)));
+  check(`SRD 2.0 dropped ${onlyIn1.length} weapons SRD 1.0 has, which is why both stay selectable`,
+    onlyIn1.length > 0);
 }
 
 group("Play page labels: English by default, Italian when the page says lang=\"it\"");
@@ -2062,7 +2124,7 @@ group("Every class carries what the detail card shows");
   // The card is page code this suite can't render, but it reads eight fields straight out of
   // classes.json — most of which nothing else in the app has ever touched. Renamed or dropped
   // upstream, they'd surface as a blank section rather than as an error.
-  const classes = await (await fetch(`../data/classes.json${RUN}`)).json();
+  const classes = await (await fetch(`../data/srd_2_0/classes.json${RUN}`)).json();
   const text = (loc) => typeof loc?.["en-US"] === "string" && loc["en-US"] !== "";
   const body = (desc) => Array.isArray(desc) && desc.length > 0 &&
     desc.every((d) => text(d.paragraph) || (Array.isArray(d.list) && d.list.every(text)));
@@ -2157,11 +2219,17 @@ group("Downtime: the two moves a rest gives you (SRD p. 105)");
 group("card art paths use the configured extension");
 {
   eq("CARD_ART_EXT", CARD_ART_EXT, "png");
-  eq("domainCardArtPath", domainCardArtPath("core_x"), `data/card-art/domain/core_x.${CARD_ART_EXT}`);
-  eq("subclassCardArtPath", subclassCardArtPath("core_y", "foundation"),
-    `data/card-art/subclass/core_y-foundation.${CARD_ART_EXT}`);
-  eq("ancestryCardArtPath", ancestryCardArtPath("core_z"), `data/card-art/ancestry/core_z.${CARD_ART_EXT}`);
-  eq("communityCardArtPath", communityCardArtPath("core_w"), `data/card-art/community/core_w.${CARD_ART_EXT}`);
+  // Art lives with its source, so these take a record. An UNTAGGED record — every fixture in this
+  // file, and any db built by something that never saw a source — falls back to the newest SRD
+  // edition, which is the same folder SRD_SOURCE names when a manifest can't be read.
+  eq("domainCardArtPath", domainCardArtPath({ id: "core_x" }), `data/srd_2_0/card-art/domain/core_x.${CARD_ART_EXT}`);
+  eq("subclassCardArtPath", subclassCardArtPath({ id: "core_y" }, "foundation"),
+    `data/srd_2_0/card-art/subclass/core_y-foundation.${CARD_ART_EXT}`);
+  eq("ancestryCardArtPath", ancestryCardArtPath({ id: "core_z" }), `data/srd_2_0/card-art/ancestry/core_z.${CARD_ART_EXT}`);
+  eq("communityCardArtPath", communityCardArtPath({ id: "core_w" }), `data/srd_2_0/card-art/community/core_w.${CARD_ART_EXT}`);
+  eq("a record from another source keeps its own art",
+    domainCardArtPath({ id: "hb_x", contentSource: "my-homebrew" }),
+    `data/my-homebrew/card-art/domain/hb_x.${CARD_ART_EXT}`);
 }
 
 group("Every choice in the wizard can be reached from the keyboard");
@@ -2199,6 +2267,365 @@ group("Every choice in the wizard can be reached from the keyboard");
   eq("a stale index falls back to the first", tabStopIndex(99, 13), 0);
 
   check("Space and Enter both choose", CHOOSE_KEYS.includes(" ") && CHOOSE_KEYS.includes("Enter"));
+}
+
+// ---------- content sources ----------
+
+const {
+  combineManifests,
+  mergeSources,
+  normalizeRecord,
+  parseManifest,
+  parseSourceInfo,
+  readsLocalManifest,
+  unresolvedReferences,
+  validateEffectEntry,
+  validateRecord,
+  visibleRecords,
+} = await import(`../shared/content-sources.js${RUN}`);
+
+const srcClass = (id, name, extra = {}) => ({ id, name, domains: ["BLADE"], ...extra });
+const srcCard = (id, name, extra = {}) => ({ id, name: { "en-US": name }, domain: "BLADE", level: 1, ...extra });
+const source = (name, records, effects) => ({ name, label: name, records, effects });
+
+group("The list of content folders survives a bad manifest");
+{
+  eq("a plain list is read as written", parseManifest('["srd","homebrew"]'), ["srd", "homebrew"]);
+  eq("junk names nothing rather than throwing", parseManifest("{oh no"), []);
+  eq("a JSON object isn't a list of folders", parseManifest('{"srd":true}'), []);
+  // The name goes straight into a fetch URL, so anything that could climb out of data/ is dropped.
+  eq("a name that could escape data/ is dropped", parseManifest('["srd","../../etc","a/b"]'), ["srd"]);
+  eq("the tracked list comes first, and repeats don't move it",
+    combineManifests(["srd"], ["homebrew", "srd"]), ["srd", "homebrew"]);
+
+  // The manifest may carry a flag as well as a list, and both shapes name the same folders.
+  eq("the object shape names the same folders", parseManifest('{"sources":["srd"],"local":true}'), ["srd"]);
+  eq("an object with no sources list names nothing", parseManifest('{"local":true}'), []);
+  // Opt-in, so a clean checkout never fetches a gitignored file that almost nobody has.
+  eq("a plain list does NOT ask for the local one", readsLocalManifest('["srd"]'), false);
+  eq("the flag is what asks for it", readsLocalManifest('{"sources":["srd"],"local":true}'), true);
+  eq("and it has to actually say true", readsLocalManifest('{"sources":["srd"],"local":"yes"}'), false);
+  eq("junk asks for nothing", readsLocalManifest("{oh no"), false);
+
+  const info = parseSourceInfo('{"label":"My Homebrew","files":["domain-cards","effects","nope"]}', "my-homebrew");
+  eq("a source says what it holds", info.files, ["domain-cards", "effects"]);
+  eq("and what to call it", info.label, "My Homebrew");
+  eq("a folder with no label is called after itself", parseSourceInfo('{"files":[]}', "homebrew").label, "homebrew");
+  eq("an unusable source.json is skipped, not guessed at", parseSourceInfo("{", "my-homebrew"), null);
+}
+
+group("A class written in the shape of its neighbours still works");
+{
+  // classes.json is the one file whose name is a bare uppercase string, because that name is a
+  // relational key: subclasses[].class holds "BARD" and create.js joins on it. Writing a class the
+  // way every other file is written is therefore the most natural homebrew mistake there is.
+  eq("a localized class name becomes the key it has to be",
+    normalizeRecord("classes", { id: "c", name: { "en-US": "Witch" } }).name, "WITCH");
+  eq("a bare one is left as the key it already is",
+    normalizeRecord("classes", { id: "c", name: "WITCH" }).name, "WITCH");
+  eq("and a card written bare gets the localized shape its readers expect",
+    normalizeRecord("domain-cards", { id: "x", name: "Ironhide" }).name, { "en-US": "Ironhide" });
+  eq("normalizing never touches the record it was given",
+    (() => { const r = { id: "c", name: "WITCH" }; normalizeRecord("classes", r); return r.name; })(), "WITCH");
+}
+
+group("A record that would kill a screen never reaches db");
+{
+  eq("a class with no domains is refused", validateRecord("classes", { id: "c", name: "WITCH" }), "missing: domains");
+  eq("a card with no domain is refused", validateRecord("domain-cards", { id: "x", name: { "en-US": "A" } }), "missing: domain");
+  eq("a record with no id is refused", validateRecord("domain-cards", { name: { "en-US": "A" } }), "missing: id");
+  eq("a subclass that names no class is refused, because nothing could ever show it",
+    validateRecord("subclasses", { id: "s", name: { "en-US": "A" } }), "missing: class (the class name, uppercase)");
+  // A source may bring a domain of its own. Rejecting one nobody has heard of would block the
+  // case this whole feature exists to be ready for.
+  eq("a domain nobody has heard of is not an error",
+    validateRecord("domain-cards", srcCard("x", "A", { domain: "DREAD" })), null);
+
+  const { db, report } = mergeSources([source("homebrew", { classes: [srcClass("hb_a", "WITCH"), { id: "hb_b", name: "SEER" }] })]);
+  eq("the usable record still lands", db.classes.map((c) => c.id), ["hb_a"]);
+  eq("and the panel can say which one didn't, and why",
+    report.sources[0].skipped, [{ file: "classes", id: "hb_b", reason: "missing: domains" }]);
+}
+
+group("A later source revises what an earlier one said");
+{
+  const { db, report } = mergeSources([
+    source("srd", { "domain-cards": [srcCard("core_a", "Untouchable"), srcCard("core_b", "Whirlwind")] }),
+    source("homebrew", { "domain-cards": [srcCard("core_a", "Untouchable (revised)")] }),
+  ]);
+  const visible = (dis) => visibleRecords(db.domainCards, dis).map((c) => c.name["en-US"]);
+  eq("the revision wins", visible(new Set()), ["Untouchable (revised)", "Whirlwind"]);
+  eq("in the position the original held", db.domainCards[0].id, "core_a");
+  eq("and every visible record knows where it came from",
+    visibleRecords(db.domainCards, new Set()).map((c) => c.contentSource), ["homebrew", "srd"]);
+  eq("the panel reports it, so an accidental duplicate is visible",
+    report.collisions, [{ file: "domain-cards", id: "core_a", from: "homebrew", over: "srd", byName: false }]);
+
+  // The record that lost is KEPT, not dropped — switching the source that beat it off has to give
+  // it back, or a folder that reprints a lot would empty the pickers the moment it went away.
+  eq("the superseded record is still in the db, marked with what took it",
+    db.domainCards.filter((c) => c.supersededBy).map((c) => [c.id, c.contentSource, c.supersededBy]),
+    [["core_a", "srd", "core_a"]]);
+  eq("switch the reviser off and the original is offered again",
+    visible(new Set(["homebrew"])), ["Whirlwind", "Untouchable"]);
+  eq("switch both off and nothing is offered", visible(new Set(["homebrew", "srd"])), []);
+
+  // A class's real key is its uppercase name, not its id: create.js joins subclasses on it. Two
+  // Bards under different ids would put two identical tiles in the picker with every Bard
+  // subclass appearing under both.
+  const byName = mergeSources([
+    source("srd", { classes: [srcClass("core_class_bard", "BARD")] }),
+    source("homebrew", { classes: [srcClass("homebrew_class_bard", "BARD")] }),
+  ]);
+  eq("a class with the same name collapses even under a new id",
+    visibleRecords(byName.db.classes, new Set()).length, 1);
+  eq("the later one being the survivor", byName.db.classes[0].id, "homebrew_class_bard");
+  eq("and the shadowed one comes back if the homebrew is switched off",
+    visibleRecords(byName.db.classes, new Set(["homebrew"])).map((c) => c.id), ["core_class_bard"]);
+  eq("and it's reported as the name clash it is", byName.report.collisions[0].byName, true);
+}
+
+group("What the panel says about records one source took over from another");
+{
+  const { takeoverSummary } = await import(`../shared/content-settings.js${RUN}`);
+  const src = (name, label, counts) => ({ name, label, counts, skipped: [] });
+  const hit = (from, over, id, file = "domain-cards") => ({ file, id, from, over, byName: false });
+
+  // A pair that collides a little is worth reading record by record: that is a homebrew folder
+  // quietly sitting on top of something, which is the whole reason this list exists.
+  const small = {
+    sources: [src("srd", "Daggerheart SRD", { domainCards: 210 }), src("mine", "My homebrew", { domainCards: 3 })],
+    collisions: [hit("mine", "srd", "a"), hit("mine", "srd", "b")],
+  };
+  eq("a small takeover is listed record by record", takeoverSummary(small, new Set()).lines.length, 2);
+  check("and it lights the nav badge", takeoverSummary(small, new Set()).unexpected === 2);
+
+  // A pair that collides wholesale is one fact repeated, and it buries the homebrew line above.
+  const big = {
+    sources: [src("srd", "Daggerheart SRD", { domainCards: 189 }), src("revised", "Revised", { domainCards: 210 })],
+    collisions: Array.from({ length: 189 }, (_, i) => hit("revised", "srd", `c${i}`)),
+  };
+  eq("a wholesale takeover collapses to one line", takeoverSummary(big, new Set()).lines,
+    ["Revised supersedes every record Daggerheart SRD has (189)"]);
+  check("and it does NOT light the nav badge, because it is what anyone would expect",
+    takeoverSummary(big, new Set()).unexpected === 0);
+
+  // With the later source switched off the takeover never happened, so saying it did sends a
+  // player looking for a change that isn't in front of them.
+  eq("nothing is claimed when the source that would take over is switched off",
+    takeoverSummary(big, new Set(["revised"])).lines, []);
+  eq("nor when the source being taken over from is switched off",
+    takeoverSummary(big, new Set(["srd"])).lines, []);
+
+  // Partial, because the reviser didn't reprint everything — so the count says something.
+  const partial = {
+    sources: [src("srd", "Daggerheart SRD", { weapons: 20 }), src("revised", "Revised", { weapons: 15 })],
+    collisions: Array.from({ length: 15 }, (_, i) => hit("revised", "srd", `w${i}`, "weapons")),
+  };
+  eq("a partial takeover says how many, so the survivors are implied",
+    takeoverSummary(partial, new Set()).lines, ["Revised supersedes 15 of Daggerheart SRD's records"]);
+}
+
+group("What a source may say its content does");
+{
+  eq("flat numbers are the ordinary case", validateEffectEntry({ evasion: 1 }), null);
+  eq("so is a permanent bonus, which is what keeps a vaulted card applying",
+    validateEffectEntry({ armorScore: 1, permanent: true }), null);
+  eq("and a whole choice, which needs no page code at all", validateEffectEntry({
+    choice: { prompt: "Pick two", kind: "benefit", pick: 2, options: [{ id: "a", label: "A", stressSlots: 1 }] },
+  }), null);
+  eq("an entry may name the feature it encodes, for the \"?\" breakdown",
+    validateEffectEntry({ evasion: 1, feature: "Unwavering" }), null);
+  eq("and say which benefit of a card it deliberately skipped",
+    validateEffectEntry({ evasion: 1, excluded: ["costs a Stress"] }), null);
+  check("a stat that isn't a number is refused",
+    validateEffectEntry({ evasion: "lots" }) !== null);
+  check("a stat this app doesn't compute is refused",
+    validateEffectEntry({ luck: 1 }) !== null);
+  // effect-choice.js renders anything that isn't "benefit" as an Experience picker rather than
+  // failing, so an unrecognised kind would silently ask the wrong question.
+  check("a choice of an unknown kind is refused rather than rendered as the wrong picker",
+    validateEffectEntry({ choice: { prompt: "?", kind: "vibes", options: [{ id: "a", label: "A" }] } }) !== null);
+  check("`when` is refused, because JSON can't carry the function it needs",
+    validateEffectEntry({ evasion: 1, when: true }) !== null);
+  // The whitelist is no wider than what shared/effects.js understands: a key with no code behind
+  // it would validate, ship, and quietly do nothing.
+  check("a mechanic this app hasn't got yet is refused rather than silently ignored",
+    validateEffectEntry({ evasion: 1, unarmedProfile: {} }) !== null);
+}
+
+group("A source's effects overlay the built-in table without replacing it");
+{
+  const { effects } = mergeSources([
+    source("srd", {}, { "core_card_a": { evasion: 1 } }),
+    source("homebrew", {}, { "core_card_a": { evasion: 3 }, "hb_card_b": { armorScore: 2 } }),
+  ]);
+  eq("a later source revises what a card does", effects["core_card_a"], { evasion: 3 });
+  eq("and may declare one of its own", effects["hb_card_b"], { armorScore: 2 });
+
+  const bad = mergeSources([source("homebrew", {}, { "hb_x": { evasion: 1, when: true } })]);
+  eq("an entry the app can't use is dropped, not applied", bad.effects["hb_x"], undefined);
+  eq("and the panel says which one, and why", bad.report.effectIssues.length, 1);
+}
+
+group("Switching a source off changes the pickers and nothing else");
+{
+  const { db } = mergeSources([
+    source("srd", { "domain-cards": [srcCard("core_a", "A")] }),
+    source("homebrew", { "domain-cards": [srcCard("homebrew_a", "B")] }),
+  ]);
+  eq("with nothing switched off, everything is offered",
+    visibleRecords(db.domainCards, new Set()).map((c) => c.id), ["core_a", "homebrew_a"]);
+  eq("a switched-off source leaves the pickers",
+    visibleRecords(db.domainCards, new Set(["homebrew"])).map((c) => c.id), ["core_a"]);
+  eq("the srd is a source like any other and can go too",
+    visibleRecords(db.domainCards, new Set(["srd", "homebrew"])).map((c) => c.id), []);
+  // Every fixture in this file, and every db built by something that predates content sources,
+  // is untagged. Dropping those would break far more than it protected.
+  eq("a record with no source is always offered",
+    visibleRecords([{ id: "plain" }], new Set(["homebrew"])).map((c) => c.id), ["plain"]);
+  // The point of the split: the record is still THERE, so a character built on it still resolves.
+  eq("but the record is still findable by id, which is what keeps a character whole",
+    db.domainCards.some((c) => c.id === "homebrew_a"), true);
+}
+
+group("A character says so when it refers to content this browser hasn't got");
+{
+  const db = {
+    classes: [{ id: "core_class_bard" }],
+    subclasses: [{ id: "core_subclass_troubadour" }],
+    ancestries: [{ id: "core_ancestry_human" }],
+    communities: [{ id: "core_community_loreborne" }],
+    weapons: [{ id: "core_weapon_shortsword" }],
+    armors: [{ id: "core_armor_leather" }],
+    domainCards: [{ id: "core_card_a" }],
+  };
+  const whole = {
+    classId: "core_class_bard", subclassId: "core_subclass_troubadour",
+    heritage: { communityId: "core_community_loreborne", ancestryIds: ["core_ancestry_human"] },
+    equipment: { primaryWeaponId: "core_weapon_shortsword", armorId: "core_armor_leather" },
+    creationDomainCardIds: ["core_card_a"],
+  };
+  eq("a character whose content is all here says nothing", unresolvedReferences(whole, db), []);
+
+  const orphan = { ...whole, classId: "myhomebrew_class_witch", equipment: { armorId: "hb_armor_ironhide" } };
+  eq("one built on a folder you no longer have names what's missing",
+    unresolvedReferences(orphan, db), [{ kind: "class", id: "myhomebrew_class_witch" }, { kind: "armor", id: "hb_armor_ironhide" }]);
+  // Unarmed and Unarmored are stored values with no record behind them. Reporting those as
+  // missing content would put a warning on the sheet of every barehanded character.
+  eq("a sentinel is not missing content",
+    unresolvedReferences({ equipment: { primaryWeaponId: "UNARMED" } }, db, { sentinels: ["UNARMED"] }), []);
+}
+
+group("A character's ids follow the editions that are loaded");
+{
+  // Two editions of one document print the same card under different ids. A character stores bare
+  // ids with no record of which edition it was built against, so changing what's loaded has to
+  // move them or the character loses its class and its gear.
+  const ed = (name, records) => source(name, records);
+  const both = mergeSources([
+    ed("srd_1_0", { classes: [srcClass("srd_1_0_class_bard", "BARD")],
+      weapons: [srcCard("srd_1_0_weapon_broadsword", "Broadsword"), srcCard("srd_1_0_weapon_gone", "Retired Blade")] }),
+    ed("srd_2_0", { classes: [srcClass("srd_2_0_class_bard", "BARD")],
+      weapons: [srcCard("srd_2_0_weapon_broadsword", "Broadsword")] }),
+  ]).db;
+  both.sourceNames = ["srd_1_0", "srd_2_0"];
+
+  eq("a bare form names the record, whichever edition printed it",
+    bareId("srd_2_0_weapon_broadsword", both.sourceNames), "weapon_broadsword");
+
+  // THE REGRESSION THIS GUARDS. Both editions claim `weapon_broadsword`, so treating every shared
+  // bare form as ambiguous refused to move ANY id — which is every id a character saved before the
+  // rename has. A superseded record is not a rival claimant: the merge already picked the winner.
+  const idx = indexRecordIds(both);
+  eq("a shared bare form resolves to the edition that won the merge",
+    idx.byBare.get("weapon_broadsword"), "srd_2_0_weapon_broadsword");
+  eq("nothing is left ambiguous just because two editions print it",
+    [...idx.byBare.values()].filter((v) => v === null).length, 0);
+
+  const old = { classId: "core_class_bard", equipment: { primaryWeaponId: "core_weapon_broadsword" } };
+  const moved = remapCharacterIds(old, both);
+  eq("an id saved under a spelling no source uses any more is re-pointed",
+    [moved.classId, moved.equipment.primaryWeaponId], ["srd_2_0_class_bard", "srd_2_0_weapon_broadsword"]);
+
+  // The other half: an id that still resolves is a deliberate choice and is never touched. Picking
+  // the SRD 1.0 weapon that SRD 2.0 dropped is the whole reason to have both editions on.
+  const kept = remapCharacterIds({ equipment: { primaryWeaponId: "srd_1_0_weapon_gone" } }, both);
+  eq("an id that still resolves is left exactly as it is",
+    kept.equipment.primaryWeaponId, "srd_1_0_weapon_gone");
+  const none = { classId: "srd_2_0_class_bard" };
+  check("and a character needing no changes comes back as the same object",
+    remapCharacterIds(none, both) === none);
+
+  // Two UNRELATED sources claiming one bare form is still a genuine ambiguity, and still refused.
+  const rival = mergeSources([
+    ed("alpha", { weapons: [srcCard("alpha_weapon_x", "Alpha Blade")] }),
+    ed("beta", { weapons: [srcCard("beta_weapon_x", "Beta Blade")] }),
+  ]).db;
+  rival.sourceNames = ["alpha", "beta"];
+  eq("two unrelated sources claiming one bare form is left alone rather than guessed at",
+    remapCharacterIds({ equipment: { armorId: "old_weapon_x" } }, rival).equipment.armorId, "old_weapon_x");
+
+  // A player's answers are stored keyed BY id, so the keys have to move with the values.
+  const answered = remapCharacterIds({ effectChoices: { "core_class_bard": { optionId: "a" } } }, both);
+  eq("an id used as a field name moves too", Object.keys(answered.effectChoices), ["srd_2_0_class_bard"]);
+
+  eq("and a bare form can be looked up directly, for the records the app names itself",
+    resolveRecordId("weapon_broadsword", both), "srd_2_0_weapon_broadsword");
+}
+
+group("A transformation sits with the heritage, and both its halves print");
+{
+  // The SRD publishes six, and one is optional per character: the field is a single id or null,
+  // not a list, and a character without one has nothing missing rather than something blank.
+  const plain = deriveSheet(sheetChar(), SHEET_DB);
+  eq("a character without one says nothing about it", plain.transformationName, null);
+  eq("and contributes no features", plain.transformationFeatures, []);
+
+  const changed = deriveSheet(sheetChar({ transformationId: "tf" }), SHEET_DB);
+  eq("one with a transformation names it", changed.transformationName, "Werewolf");
+  // Both, always: the drawback is not optional, and one the player forgets never happens at the
+  // table. Unlike a mixed ancestry there is nothing to choose between them.
+  eq("and prints BOTH features, benefit and drawback",
+    changed.transformationFeatures.map((f) => f.name), ["Wolf Form", "Howling Rampage"]);
+  eq("each attributed to the transformation that brought it",
+    [...new Set(changed.transformationFeatures.map((f) => f.source))], ["Werewolf"]);
+  eq("an id naming nothing loaded is simply absent, not a crash",
+    deriveSheet(sheetChar({ transformationId: "gone" }), SHEET_DB).transformationName, null);
+}
+
+group("What a transformation does to the numbers, and what it deliberately doesn't");
+{
+  // Eleven of SRD 2.0's twelve transformation features are in-play actions, rest-and-fiction
+  // rules, a death move, or a mechanic with no stat here — so they are read and left out, on the
+  // same line every other entry in effects.js is drawn on. Demigod's Gifted is the exception.
+  const TF_DB = {
+    transformations: [
+      { id: "srd_2_0_transformation_demigod", name: { "en-US": "Demigod" },
+        features: [{ name: { "en-US": "Gifted" } }, { name: { "en-US": "Weight of Divinity" } }] },
+      { id: "srd_2_0_transformation_werewolf", name: { "en-US": "Werewolf" },
+        features: [{ name: { "en-US": "Wolf Form" } }, { name: { "en-US": "Howling Rampage" } }] },
+    ],
+    sourceNames: ["srd_2_0"],
+  };
+  const collect = (id) => collectEffects({ ...newCharacter(), transformationId: id }, TF_DB);
+
+  const demigod = collect("srd_2_0_transformation_demigod");
+  eq("Gifted is catalogued once, tagged as a transformation",
+    demigod.map((e) => e.source), ["transformation"]);
+  eq("a +1 to action rolls is the attack and Spellcast numbers the sheet prints",
+    [demigod[0].effect.attack, demigod[0].effect.spellcast], [1, 1]);
+  has("and the breakdown names the transformation it came from", [demigod[0].label], "Demigod");
+  check("the damage half is excluded out loud rather than silently dropped",
+    demigod[0].effect.excluded.some((x) => /damage/.test(x)));
+  // Weight of Divinity costs a Stress when you fail a roll. That's play, not a total.
+  eq("its drawback moves no number, so it gets no entry", demigod.length, 1);
+
+  // Wolf Form's 1d10 is real, but you spend a Stress to enter it — the catalogue's line is
+  // exactly "in effect right now given only what we store".
+  eq("a transformation whose features are all in-play actions contributes nothing",
+    collect("srd_2_0_transformation_werewolf"), []);
+  eq("and no transformation at all contributes nothing", collect(null), []);
 }
 
 // ---------- report ----------

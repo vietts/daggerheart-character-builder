@@ -3,6 +3,8 @@
 // this file only builds DOM.
 
 import { ensureLevelFields } from "./shared/advancement.js";
+import { loadContent } from "./shared/content-load.js";
+import { remapCharacterIds } from "./shared/content-ids.js";
 import { deriveSheet } from "./shared/sheet-data.js";
 
 const CHAR_STORAGE_KEY = "dh-characters-v1";
@@ -14,20 +16,12 @@ function el(tag, className, text) {
   return node;
 }
 
-async function loadJson(name) {
-  const res = await fetch(`data/${name}.json`);
-  return res.json();
-}
-
-// Same eight files every other page loads (see create.js/level-up.js/characters.js's
-// loadAllData()); deriveSheet() only reads what it needs from this object and returns
-// null for anything it can't find, so there's no harm in always loading the full set.
+// Every source, unfiltered and unswitchable. This page has no top bar and no Content button,
+// which is correct: it prints what the character IS, so a source switched off for the pickers
+// must still resolve here or the sheet would print gaps for content the character really has.
 async function loadAllData() {
-  const [classes, subclasses, ancestries, communities, domainCards, weapons, armors, consumables] = await Promise.all([
-    loadJson("classes"), loadJson("subclasses"), loadJson("ancestries"), loadJson("communities"),
-    loadJson("domain-cards"), loadJson("weapons"), loadJson("armors"), loadJson("consumables"),
-  ]);
-  return { classes, subclasses, ancestries, communities, domainCards, weapons, armors, consumables };
+  const { db } = await loadContent();
+  return db;
 }
 
 // Read-only: getItem only, never setItem. ensureLevelFields() backfills the fields
@@ -66,7 +60,11 @@ function tickRow(label, count, note) {
 function renderIdentity(s) {
   const box = el("header", "sheet-identity");
   box.appendChild(el("h1", "sheet-name", s.name));
-  const heritage = [s.ancestryNames.join(" + ") || "—", s.communityName].join(" · ");
+  // A transformation joins the heritage rather than getting a line of its own — "add the card to
+  // your loadout as if it were part of your character's heritage" — and is simply absent for the
+  // characters who have none.
+  const heritage = [s.ancestryNames.join(" + ") || "—", s.communityName, s.transformationName]
+    .filter(Boolean).join(" · ");
   box.appendChild(el("p", "sheet-subtitle",
     `${s.className} · ${s.subclassName} (${s.subclassTierLabel}) — ${heritage}`));
   const stats = el("div", "sheet-identity-stats");
@@ -238,6 +236,7 @@ function renderFeatureStrip(s) {
     ...s.subclassFeatures.map((f) => f.name),
     ...s.ancestryFeatures.map((f) => f.name),
     ...s.communityFeatures.map((f) => f.name),
+    ...s.transformationFeatures.map((f) => f.name),
   ].filter(Boolean);
   const box = el("section", "sheet-features");
   box.appendChild(el("h2", null, "Features"));
@@ -323,6 +322,9 @@ function renderPageTwo(s) {
   for (const f of s.subclassFeatures) feats.appendChild(featureBlock(f, `${s.subclassName} (${f.source})`));
   for (const f of s.ancestryFeatures) feats.appendChild(featureBlock(f, f.source));
   for (const f of s.communityFeatures) feats.appendChild(featureBlock(f, f.source));
+  // A transformation's drawback prints in full for the same reason its benefit does: the rules
+  // ask the player to remind their GM of it, which they can't do from a name alone.
+  for (const f of s.transformationFeatures) feats.appendChild(featureBlock(f, f.source));
   // Equipment features are prose the app never applies mechanically (e.g. Gambeson's
   // "+1 to Evasion"). Printing them is what lets the player apply them by hand.
   for (const w of s.weapons) {
@@ -361,7 +363,9 @@ async function init() {
   const db = await loadAllData();
 
   const id = new URLSearchParams(location.search).get("id");
-  const character = loadCharacters().find((c) => c.id === id);
+  // A record's id names the edition that published it, so switching which SRD is loaded moves
+  // every id a character stores. Re-point them at what IS loaded before anything reads them.
+  const character = remapCharacterIds(loadCharacters().find((c) => c.id === id), db);
   if (!character) {
     renderNotFound(root);
     return;
