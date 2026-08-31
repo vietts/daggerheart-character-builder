@@ -1,0 +1,2282 @@
+[
+ {
+  "id": "srd_2_0_consumable_stride_potion",
+  "name": {
+   "en-US": "Stride Potion"
+  },
+  "set": "core",
+  "roll": 1,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You gain a +1 bonus to your next Agility Roll."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_bolster_potion",
+  "name": {
+   "en-US": "Bolster Potion"
+  },
+  "set": "core",
+  "roll": 2,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You gain a +1 bonus to your next Strength Roll."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_control_potion",
+  "name": {
+   "en-US": "Control Potion"
+  },
+  "set": "core",
+  "roll": 3,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You gain a +1 bonus to your next Finesse Roll."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_attune_potion",
+  "name": {
+   "en-US": "Attune Potion"
+  },
+  "set": "core",
+  "roll": 4,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You gain a +1 bonus to your next Instinct Roll."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_charm_potion",
+  "name": {
+   "en-US": "Charm Potion"
+  },
+  "set": "core",
+  "roll": 5,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You gain a +1 bonus to your next Presence Roll."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_enlighten_potion",
+  "name": {
+   "en-US": "Enlighten Potion"
+  },
+  "set": "core",
+  "roll": 6,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You gain a +1 bonus to your next Knowledge Roll."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_minor_health_potion",
+  "name": {
+   "en-US": "Minor Health Potion"
+  },
+  "set": "core",
+  "roll": 7,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "Clear 1d4 HP."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_minor_stamina_potion",
+  "name": {
+   "en-US": "Minor Stamina Potion"
+  },
+  "set": "core",
+  "roll": 8,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "Clear 1d4 Stress."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_grindletooth_venom",
+  "name": {
+   "en-US": "Grindletooth Venom"
+  },
+  "set": "core",
+  "roll": 9,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can apply this venom to a weapon that deals physical damage to add a d6 to your next damage roll with that weapon."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_varik_leaves",
+  "name": {
+   "en-US": "Varik Leaves"
+  },
+  "set": "core",
+  "roll": 10,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can eat these paired leaves to immediately gain 2 Hope."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_vial_of_moondrip",
+  "name": {
+   "en-US": "Vial of Moondrip"
+  },
+  "set": "core",
+  "roll": 11,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "When you drink the contents of this vial, you can see in total darkness until your next rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_unstable_arcane_shard",
+  "name": {
+   "en-US": "Unstable Arcane Shard"
+  },
+  "set": "core",
+  "roll": 12,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can make a Finesse Roll to throw this shard at a group of adversaries within Far range. Targets you succeed against take 1d20 magic damage."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_potion_of_stability",
+  "name": {
+   "en-US": "Potion of Stability"
+  },
+  "set": "core",
+  "roll": 13,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can drink this potion to choose one additional downtime move."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_improved_grindletooth_venom",
+  "name": {
+   "en-US": "Improved Grindletooth Venom"
+  },
+  "set": "core",
+  "roll": 14,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can apply this venom to a weapon that deals physical damage to add a d8 to your next damage roll with that weapon."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_morphing_clay",
+  "name": {
+   "en-US": "Morphing Clay"
+  },
+  "set": "core",
+  "roll": 15,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can spend a Hope to use this clay, altering your face enough to make you unrecognizable until your next rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_vial_of_darksmoke",
+  "name": {
+   "en-US": "Vial of Darksmoke"
+  },
+  "set": "core",
+  "roll": 16,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "When an adversary attacks you, use this vial and roll a number of d6s equal to your Agility. Add the highest result to your Evasion against the attack."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_jumping_root",
+  "name": {
+   "en-US": "Jumping Root"
+  },
+  "set": "core",
+  "roll": 17,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "Eat this root to leap up to Far range once without needing to roll."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_snap_powder",
+  "name": {
+   "en-US": "Snap Powder"
+  },
+  "set": "core",
+  "roll": 18,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "Mark a Stress and clear a HP."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_health_potion",
+  "name": {
+   "en-US": "Health Potion"
+  },
+  "set": "core",
+  "roll": 19,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "Clear 1d4+1 HP."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_stamina_potion",
+  "name": {
+   "en-US": "Stamina Potion"
+  },
+  "set": "core",
+  "roll": 20,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "Clear 1d4+1 Stress."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_armor_stitcher",
+  "name": {
+   "en-US": "Armor Stitcher"
+  },
+  "set": "core",
+  "roll": 21,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can use this stitcher to spend any number of Hope and clear that many Armor Slots."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_gill_salve",
+  "name": {
+   "en-US": "Gill Salve"
+  },
+  "set": "core",
+  "roll": 22,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can apply this salve to your neck to breathe underwater for a number of minutes equal to your level."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_replication_parchment",
+  "name": {
+   "en-US": "Replication Parchment"
+  },
+  "set": "core",
+  "roll": 23,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "By touching this piece of parchment to another, you can perfectly copy the second parchment’s contents. Once used, this parchment becomes mundane paper."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_improved_arcane_shard",
+  "name": {
+   "en-US": "Improved Arcane Shard"
+  },
+  "set": "core",
+  "roll": 24,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can make a Finesse Roll to throw this shard at a group of adversaries within Far range. Targets you succeed against take 2d20 magic damage."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_major_stride_potion",
+  "name": {
+   "en-US": "Major Stride Potion"
+  },
+  "set": "core",
+  "roll": 25,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You gain a +1 bonus to your Agility until your next rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_major_bolster_potion",
+  "name": {
+   "en-US": "Major Bolster Potion"
+  },
+  "set": "core",
+  "roll": 26,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You gain a +1 bonus to your Strength until your next rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_major_control_potion",
+  "name": {
+   "en-US": "Major Control Potion"
+  },
+  "set": "core",
+  "roll": 27,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You gain a +1 bonus to your Finesse until your next rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_major_attune_potion",
+  "name": {
+   "en-US": "Major Attune Potion"
+  },
+  "set": "core",
+  "roll": 28,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You gain a +1 bonus to your Instinct until your next rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_major_charm_potion",
+  "name": {
+   "en-US": "Major Charm Potion"
+  },
+  "set": "core",
+  "roll": 29,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You gain a +1 bonus to your Presence until your next rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_major_enlighten_potion",
+  "name": {
+   "en-US": "Major Enlighten Potion"
+  },
+  "set": "core",
+  "roll": 30,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You gain a +1 bonus to your Knowledge until your next rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_blood_of_the_yorgi",
+  "name": {
+   "en-US": "Blood of the Yorgi"
+  },
+  "set": "core",
+  "roll": 31,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can drink this blood to disappear from where you are and immediately reappear at a point you can see within Very Far range."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_homet_s_secret_potion",
+  "name": {
+   "en-US": "Homet’s Secret Potion"
+  },
+  "set": "core",
+  "roll": 32,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "After drinking this potion, the next successful attack you make critically succeeds."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_redthorn_saliva",
+  "name": {
+   "en-US": "Redthorn Saliva"
+  },
+  "set": "core",
+  "roll": 33,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can apply this saliva to a weapon that deals physical damage to add a d12 to your next damage roll with that weapon."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_channelstone",
+  "name": {
+   "en-US": "Channelstone"
+  },
+  "set": "core",
+  "roll": 34,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can use this stone to take a spell or grimoire from your vault, use it once, and return it to your vault."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_mythic_dust",
+  "name": {
+   "en-US": "Mythic Dust"
+  },
+  "set": "core",
+  "roll": 35,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can apply this dust to a weapon that deals magic damage to add a d12 to your next damage roll with that weapon."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_acidpaste",
+  "name": {
+   "en-US": "Acidpaste"
+  },
+  "set": "core",
+  "roll": 36,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "This paste eats away walls and other surfaces in bright flashes."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_hopehold_flare",
+  "name": {
+   "en-US": "Hopehold Flare"
+  },
+  "set": "core",
+  "roll": 37,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "When you use this flare, allies within Close range roll a d6 when they spend a Hope. On a result of 6, they gain the effect of that Hope without spending it. The flare lasts until the end of the scene."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_major_arcane_shard",
+  "name": {
+   "en-US": "Major Arcane Shard"
+  },
+  "set": "core",
+  "roll": 38,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can make a Finesse Roll to throw this shard at a group of adversaries within Far range. Targets you succeed against take 4d20 magic damage."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_featherbone",
+  "name": {
+   "en-US": "Featherbone"
+  },
+  "set": "core",
+  "roll": 39,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can use this bone to control your falling speed for a number of minutes equal to your level."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_circle_of_the_void",
+  "name": {
+   "en-US": "Circle of the Void"
+  },
+  "set": "core",
+  "roll": 40,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "Mark a Stress to create a void that extends up to Far range. No magic can be cast inside the void, and creatures within the void are immune to magic damage."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_sun_tree_sap",
+  "name": {
+   "en-US": "Sun Tree Sap"
+  },
+  "set": "core",
+  "roll": 41,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "Consume this sap to roll a d6. On a result of 5–6, clear 2 HP. On a result of 2–4, clear 3 Stress. On a result of 1, see through the veil of death and return changed, gaining one scar."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_dripfang_poison",
+  "name": {
+   "en-US": "Dripfang Poison"
+  },
+  "set": "core",
+  "roll": 42,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "A creature who consumes this poison takes 8d10 direct magic damage."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_major_health_potion",
+  "name": {
+   "en-US": "Major Health Potion"
+  },
+  "set": "core",
+  "roll": 43,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "Clear 1d4+2 HP."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_major_stamina_potion",
+  "name": {
+   "en-US": "Major Stamina Potion"
+  },
+  "set": "core",
+  "roll": 44,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "Clear 1d4+2 Stress."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_ogre_musk",
+  "name": {
+   "en-US": "Ogre Musk"
+  },
+  "set": "core",
+  "roll": 45,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can use this musk to prevent anyone from tracking you by mundane or magical means until your next rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_wingsprout",
+  "name": {
+   "en-US": "Wingsprout"
+  },
+  "set": "core",
+  "roll": 46,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You gain magic wings that allow you to fly for a number of minutes equal to your level."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_jar_of_lost_voices",
+  "name": {
+   "en-US": "Jar of Lost Voices"
+  },
+  "set": "core",
+  "roll": 47,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can open this jar to release a deafening echo of voices for a number of minutes equal to your Instinct. Creatures within Far range unprepared for the sound take 6d8 magic damage."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_dragonbloom_tea",
+  "name": {
+   "en-US": "Dragonbloom Tea"
+  },
+  "set": "core",
+  "roll": 48,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can drink this tea to unleash a fiery breath attack. Make an Instinct Roll against all adversaries in front of you within Close range. Targets you succeed against take d20 physical damage using your Proficiency."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_bridge_seed",
+  "name": {
+   "en-US": "Bridge Seed"
+  },
+  "set": "core",
+  "roll": 49,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "Thick vines grow from your location to a point of your choice within Far range, allowing you to climb up or across them. The vines dissipate on your next short rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_sleeping_sap",
+  "name": {
+   "en-US": "Sleeping Sap"
+  },
+  "set": "core",
+  "roll": 50,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can drink this potion to fall asleep for a full night’s rest. You clear all Stress upon waking."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_feast_of_xuria",
+  "name": {
+   "en-US": "Feast of Xuria"
+  },
+  "set": "core",
+  "roll": 51,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can eat this meal to clear all HP and Stress and gain 1d4 Hope."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_bonding_honey",
+  "name": {
+   "en-US": "Bonding Honey"
+  },
+  "set": "core",
+  "roll": 52,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "This honey can be used to glue two objects together permanently."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_shrinking_potion",
+  "name": {
+   "en-US": "Shrinking Potion"
+  },
+  "set": "core",
+  "roll": 53,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can drink this potion to halve your size until you choose to drop this form or your next rest. While in this form, you have a +2 bonus to Agility and a −1 penalty to your Proficiency."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_growing_potion",
+  "name": {
+   "en-US": "Growing Potion"
+  },
+  "set": "core",
+  "roll": 54,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can drink this potion to double your size until you choose to drop this form or your next rest. While in this form, you have a +2 bonus to Strength and a +1 bonus to your Proficiency."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_knowledge_stone",
+  "name": {
+   "en-US": "Knowledge Stone"
+  },
+  "set": "core",
+  "roll": 55,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "If you die while holding this stone, an ally can take a card from your loadout to place in their loadout or vault. After they take this knowledge, the stone crumbles."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_sweet_moss",
+  "name": {
+   "en-US": "Sweet Moss"
+  },
+  "set": "core",
+  "roll": 56,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can consume this moss during a rest to clear 1d10 HP or 1d10 Stress."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_blinding_orb",
+  "name": {
+   "en-US": "Blinding Orb"
+  },
+  "set": "core",
+  "roll": 57,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can activate this orb to create a flash of bright light. All targets within Close range become Vulnerable until they mark HP."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_death_tea",
+  "name": {
+   "en-US": "Death Tea"
+  },
+  "set": "core",
+  "roll": 58,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "After you drink this tea, you instantly kill your target when you critically succeed on an attack. If you don’t critically succeed on an attack before your next long rest, you die."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_mirror_of_marigold",
+  "name": {
+   "en-US": "Mirror of Marigold"
+  },
+  "set": "core",
+  "roll": 59,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "When you take damage, you can spend a Hope to negate that damage, after which the mirror shatters."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_stardrop",
+  "name": {
+   "en-US": "Stardrop"
+  },
+  "set": "core",
+  "roll": 60,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can use this stardrop to summon a hailstorm of comets that deals 8d20 physical damage to all targets within Very Far range."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_warding_candle",
+  "name": {
+   "en-US": "Warding Candle"
+  },
+  "set": "hopeandfear",
+  "roll": 1,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can light this candle to fill an area within Close range with a halo of light. A creature outside the halo can’t enter it if they have ill intent toward a creature within it. The candle burns for an hour."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_iridian_dust",
+  "name": {
+   "en-US": "Iridian Dust"
+  },
+  "set": "hopeandfear",
+  "roll": 2,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "This multicolored powder sticks to everything and prevents creatures covered in it from becoming Hidden."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_verglasian_seed",
+  "name": {
+   "en-US": "Verglasian Seed"
+  },
+  "set": "hopeandfear",
+  "roll": 3,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can use this ice shard to instantly freeze an area of water up to Close range."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_cupbearers_bezoar",
+  "name": {
+   "en-US": "Cupbearer’s Bezoar"
+  },
+  "set": "hopeandfear",
+  "roll": 4,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can swallow this bezoar to become immune to poisons until your next long rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_mossmantle_potion",
+  "name": {
+   "en-US": "Mossmantle Potion"
+  },
+  "set": "hopeandfear",
+  "roll": 5,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can drink this tea to perfectly blend into natural environments until your next rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_lyrebird_lozenge",
+  "name": {
+   "en-US": "Lyrebird Lozenge"
+  },
+  "set": "hopeandfear",
+  "roll": 6,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can dissolve this lozenge in your mouth to perfectly mimic any voice you’ve heard until the end of the scene."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_vial_of_featherfall",
+  "name": {
+   "en-US": "Vial of Featherfall"
+  },
+  "set": "hopeandfear",
+  "roll": 7,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can drink this potion to ignore damage from falling for the next 10 minutes."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_chimeric_saliva",
+  "name": {
+   "en-US": "Chimeric Saliva"
+  },
+  "set": "hopeandfear",
+  "roll": 8,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can apply this saliva to a weapon that deals physical damage to change its damage type to magic until your next rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_packet_of_space_dust",
+  "name": {
+   "en-US": "Packet of Space Dust"
+  },
+  "set": "hopeandfear",
+  "roll": 9,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "This dust causes anything it covers to become lighter than air. One packet contains enough dust to cover the contents of a picnic basket, and the effects last for an hour."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_pipeweed",
+  "name": {
+   "en-US": "Pipeweed"
+  },
+  "set": "hopeandfear",
+  "roll": 10,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "When you choose the Clear Stress downtime move during a short rest, you can smoke this non-intoxicating leaf to clear an additional Stress. Any other PCs who chose the Clear Stress downtime move also gain this benefit."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_deathseers_powder",
+  "name": {
+   "en-US": "Deathseer’s Powder"
+  },
+  "set": "hopeandfear",
+  "roll": 11,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can sprinkle this powder over a recently deceased corpse to conjure a spectral reprise of their final minute of life."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_slayers_salt",
+  "name": {
+   "en-US": "Slayer’s Salt"
+  },
+  "set": "hopeandfear",
+  "roll": 12,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can spread this salt in a line along windowsills or thresholds to create a magical barrier that undead creatures can’t cross until the line is broken."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_yakamel_milk",
+  "name": {
+   "en-US": "Yakamel Milk"
+  },
+  "set": "hopeandfear",
+  "roll": 13,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "After consuming this milk, the next time you clear 1 or more Hit Points, you clear an additional Hit Point."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_glowmoss_mushroom",
+  "name": {
+   "en-US": "Glowmoss Mushroom"
+  },
+  "set": "hopeandfear",
+  "roll": 14,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can break this mushroom into pieces, causing it to glow bright blue until your next long rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_red_ooze_oil",
+  "name": {
+   "en-US": "Red Ooze Oil"
+  },
+  "set": "hopeandfear",
+  "roll": 15,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can coat your weapon in this oil. The next successful attack you make with this weapon deals an extra 1d8 magic damage and temporarily Ignites the target. While Ignited, the target takes 1d4 magic damage when they take the spotlight."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_instant_camp",
+  "name": {
+   "en-US": "Instant Camp"
+  },
+  "set": "hopeandfear",
+  "roll": 16,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can unfold this small mechanical box into a camping tent large enough to safely house six people. The tent collapses at the end of your next long rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_bundle_of_spiderlegs",
+  "name": {
+   "en-US": "Bundle of Spiderlegs"
+  },
+  "set": "hopeandfear",
+  "roll": 17,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can eat these spiderlegs to walk on walls until your next rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_ciscan_fog_bottle",
+  "name": {
+   "en-US": "Ciscan Fog Bottle"
+  },
+  "set": "hopeandfear",
+  "roll": 18,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can break this jar to fill the area within Close range with magical mist. A creature who enters the mist clears a Stress and becomes Hidden."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_snapthorn_seed",
+  "name": {
+   "en-US": "Snapthorn Seed"
+  },
+  "set": "hopeandfear",
+  "roll": 19,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can throw this seed at a point you can see. It explodes into a tangle of binding vines that temporarily Restrains all creatures within Close range of that point."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_sprite_bottle",
+  "name": {
+   "en-US": "Sprite Bottle"
+  },
+  "set": "hopeandfear",
+  "roll": 20,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "When you mark your last Hit Point, this bottle shatters to release the Sprite inside. The Sprite clears all your Hit Points before fading from the Mortal Realm."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_gravity_bomb",
+  "name": {
+   "en-US": "Gravity Bomb"
+  },
+  "set": "hopeandfear",
+  "roll": 21,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can throw this peach-sized mechanical orb at a point within Far range. It implodes and pulls all creatures and objects within Close range of that point into Melee range with it."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_gossip_flower",
+  "name": {
+   "en-US": "Gossip Flower"
+  },
+  "set": "hopeandfear",
+  "roll": 22,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can plant this seed in soil. It instantly grows into a small flower that records everything it hears for up to one week. When plucked, the flower recites what it recorded in real time, then withers."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_displacement_token",
+  "name": {
+   "en-US": "Displacement Token"
+  },
+  "set": "hopeandfear",
+  "roll": 23,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can swallow this token to conjure two illusions of yourself that you can control. Each illusion lasts until it takes damage or until your next rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_night_hags_dust",
+  "name": {
+   "en-US": "Night Hag’s Dust"
+  },
+  "set": "hopeandfear",
+  "roll": 24,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can blow this dust in an adversary’s face to prevent them from clearing Stress until your next long rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_self_sewing_thread",
+  "name": {
+   "en-US": "Self-Sewing Thread"
+  },
+  "set": "hopeandfear",
+  "roll": 25,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can use this thread to clear either a Hit Point or 2 Armor Slots."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_stonemasons_fortune",
+  "name": {
+   "en-US": "Stonemason’s Fortune"
+  },
+  "set": "hopeandfear",
+  "roll": 26,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "When you throw this gray brick on the ground, it immediately grows into a 6-foot-tall, 10-foot-wide, and 2-foot-deep wall of solid stone."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_mnemonic_potion",
+  "name": {
+   "en-US": "Mnemonic Potion"
+  },
+  "set": "hopeandfear",
+  "roll": 27,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can drink this potion to Utilize an Experience without spending a Hope."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_salamander_salve",
+  "name": {
+   "en-US": "Salamander Salve"
+  },
+  "set": "hopeandfear",
+  "roll": 28,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can apply this salve to your skin to make yourself immune to heat until your next rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_green_ooze_oil",
+  "name": {
+   "en-US": "Green Ooze Oil"
+  },
+  "set": "hopeandfear",
+  "roll": 29,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can coat your weapon in this oil. The next successful attack you make with this weapon deals an extra 1d8 magic damage and temporarily Corrodes the target. While Corroded, the target gains a −2 penalty to their damage thresholds."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_sunlight_orb",
+  "name": {
+   "en-US": "Sunlight Orb"
+  },
+  "set": "hopeandfear",
+  "roll": 30,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can shatter this orb to make the area within Very Far range appear as though it’s sunlit daytime for the next 24 hours."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_moonlight_orb",
+  "name": {
+   "en-US": "Moonlight Orb"
+  },
+  "set": "hopeandfear",
+  "roll": 31,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can shatter this orb to make the area within Very Far range appear as though it’s moonlit nighttime for the next 24 hours."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_midas_flask",
+  "name": {
+   "en-US": "Midas Flask"
+  },
+  "set": "hopeandfear",
+  "roll": 32,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can pour this small flask of alchemical liquid over a mundane item to instantly transmute it into a handful of gold."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_staff_of_reversal",
+  "name": {
+   "en-US": "Staff of Reversal"
+  },
+  "set": "hopeandfear",
+  "roll": 33,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can break this staff against the ground to reverse one magical transformation or effect within Far range."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_berserkers_brew",
+  "name": {
+   "en-US": "Berserker’s Brew"
+  },
+  "set": "hopeandfear",
+  "roll": 34,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "When you drink this dram of liquid, you gain a bonus to your Strength and a penalty to your Finesse and Knowledge equal to your Instinct (minimum 1). This effect lasts until you make a death move or until your next rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_emberite_shard",
+  "name": {
+   "en-US": "Emberite Shard"
+  },
+  "set": "hopeandfear",
+  "roll": 35,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "Choose a point within Far range. All targets within Close range of that point must succeed on a Reaction Roll (16) or take 3d6 magic damage and become temporarily Ablaze. While Ablaze, a creature must roll a d4 whenever they make an action roll. On a result of 1, they mark a Hit Point. On a result of 4, they clear the Ablaze condition."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_arcticite_shard",
+  "name": {
+   "en-US": "Arcticite Shard"
+  },
+  "set": "hopeandfear",
+  "roll": 36,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "Choose a point within Far range. All targets within Close range of that point must succeed on a Reaction Roll (16) or take 3d6 magic damage and become temporarily Restrained by ice."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_fulgurite_shard",
+  "name": {
+   "en-US": "Fulgurite Shard"
+  },
+  "set": "hopeandfear",
+  "roll": 37,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "Choose a point within Far range. All targets within Close range of that point must succeed on a Reaction Roll (16) or take 3d6 magic damage and mark 1d4 Stress as lightning crackles through the area."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_demiurges_draught",
+  "name": {
+   "en-US": "Demiurge’s Draught"
+  },
+  "set": "hopeandfear",
+  "roll": 38,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can drink this draught to gain a +1 bonus to your Proficiency for your next successful attack roll."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_cockerel_claw_tea",
+  "name": {
+   "en-US": "Cockerel Claw Tea"
+  },
+  "set": "hopeandfear",
+  "roll": 39,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can drink this tea to refresh your features as if you had taken a long rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_potion_of_vigilance",
+  "name": {
+   "en-US": "Potion of Vigilance"
+  },
+  "set": "hopeandfear",
+  "roll": 40,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can drink this potion to gain a +1 bonus to your Evasion until you mark a Hit Point."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_cacophonous_concoction",
+  "name": {
+   "en-US": "Cacophonous Concoction"
+  },
+  "set": "hopeandfear",
+  "roll": 41,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "When you drink this potion, anything you say or do in the next hour becomes impossible for a witness to recount. Any attempts they make to communicate what they saw, heard, or otherwise sensed comes out garbled or nonsensical."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_nightmare_mead",
+  "name": {
+   "en-US": "Nightmare Mead"
+  },
+  "set": "hopeandfear",
+  "roll": 42,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can drink this potion to discover the deepest fear of the next person you make eye contact with. When you do, the GM gains a Fear."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_stake_of_abjuration",
+  "name": {
+   "en-US": "Stake of Abjuration"
+  },
+  "set": "hopeandfear",
+  "roll": 43,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can hammer this stake into the ground and make a proclamation. Until your next rest, a creature within Far range of the stake who transgresses that proclamation must mark a Stress. The stake lasts until your next rest, then it shatters."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_psychopomps_shroud",
+  "name": {
+   "en-US": "Psychopomp’s Shroud"
+  },
+  "set": "hopeandfear",
+  "roll": 44,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can place this shroud over the corpse of a recently deceased creature. The creature’s spirit enters the shroud and becomes your spectral assistant until the next sunrise, when they pass through the veil of death and take the shroud with them."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_phial_of_deep_ink",
+  "name": {
+   "en-US": "Phial of Deep Ink"
+  },
+  "set": "hopeandfear",
+  "roll": 45,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can drink this bottle of ink to transform into a cephalopod of roughly your size for the next hour. You gain rubbery skin, soft bones, the ability to breathe underwater, and new limbs until you have eight total."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_mesmers_tonic",
+  "name": {
+   "en-US": "Mesmer’s Tonic"
+  },
+  "set": "hopeandfear",
+  "roll": 46,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "When you drink this tonic, the only thing you can hear until your next rest are the surface thoughts of creatures within Very Close range."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_invisibility_potion",
+  "name": {
+   "en-US": "Invisibility Potion"
+  },
+  "set": "hopeandfear",
+  "roll": 47,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You are Hidden until you deal damage to another creature or until your next rest."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_formoid_serum",
+  "name": {
+   "en-US": "Formoid Serum"
+  },
+  "set": "hopeandfear",
+  "roll": 48,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can drink this potion to become a swarm of 16 million ants until the end of the scene. You keep and have access to all equipment, loot, and features."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_steelskin_salve",
+  "name": {
+   "en-US": "Steelskin Salve"
+  },
+  "set": "hopeandfear",
+  "roll": 49,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can apply this salve to your skin to gain a bonus to your damage thresholds equal to your tier until the end of the scene."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_godlings_pomelo",
+  "name": {
+   "en-US": "Godling’s Pomelo"
+  },
+  "set": "hopeandfear",
+  "roll": 50,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can eat this citrus fruit to clear all Hit Points and Stress."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_snakeskin_spirit",
+  "name": {
+   "en-US": "Snakeskin Spirit"
+  },
+  "set": "hopeandfear",
+  "roll": 51,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can drink this potion to slough off your outer layer of skin and heal a scar."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_magic_users_malison",
+  "name": {
+   "en-US": "Magic-User’s Malison"
+  },
+  "set": "hopeandfear",
+  "roll": 52,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "When you release this spellcaster’s trapped soul, you can cast one spell from a card in your vault as if it were in your loadout. This doesn’t work for permanently vaulted cards."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_quintessential_severant",
+  "name": {
+   "en-US": "Quintessential Severant"
+  },
+  "set": "hopeandfear",
+  "roll": 53,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can use this magic blade to cut one magical or metaphysical bond, such as an enchantment, contract, magical tether, or divine oath. When you do, the blade shatters."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_mask_of_the_echoed_self",
+  "name": {
+   "en-US": "Mask of the Echoed Self"
+  },
+  "set": "hopeandfear",
+  "roll": 54,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can wear this mask during your next level up to swap the values of any of your traits. When you do, the mask becomes your permanent face."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_necroprancers_bell",
+  "name": {
+   "en-US": "Necroprancer’s Bell"
+  },
+  "set": "hopeandfear",
+  "roll": 55,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can break this rusted, clapperless bell against the ground to summon a skeletal steed that climbs out of the earth and serves you until the next sunrise."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_drakemantle",
+  "name": {
+   "en-US": "Drakemantle"
+  },
+  "set": "hopeandfear",
+  "roll": 56,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can use this enchanted ancient dragon hide to gain draconic characteristics until the end of the scene, when the hide falls aways in tatters. Until then, you can fly and gain a +5 bonus to your damage thresholds and a +1 bonus to your Proficiency."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_gamblers_fallacy",
+  "name": {
+   "en-US": "Gambler’s Fallacy"
+  },
+  "set": "hopeandfear",
+  "roll": 57,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can spend any number of handfuls of gold by placing them into this slotted ceramic jar shaped like a pig. When you throw the jar at a point within Far range, it explodes and deals 1d20 magic damage for each handful of gold spent to all creatures within Close range of that point. All gold within the jar is destroyed."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_lionheart_tonic",
+  "name": {
+   "en-US": "Lionheart Tonic"
+  },
+  "set": "hopeandfear",
+  "roll": 58,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can drink this tonic to gain a +1 bonus to your Proficiency until you roll with Fear."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_tears_of_the_undying_hero",
+  "name": {
+   "en-US": "Tears of the Undying Hero"
+  },
+  "set": "hopeandfear",
+  "roll": 59,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "When you drink this potion, death can’t touch you until your next long rest. When you would mark your last Hit Point, instead of making a death move, you make one final action roll before falling into a dreamless slumber until an ally chooses the Tend to Wounds downtime move to clear your Hit Points."
+      }
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "id": "srd_2_0_consumable_featherstep_potion",
+  "name": {
+   "en-US": "Featherstep Potion"
+  },
+  "set": "hopeandfear",
+  "roll": 60,
+  "features": [
+   {
+    "description": [
+     {
+      "paragraph": {
+       "en-US": "You can drink this potion to sprout small wings from your ankles that give you a bonus to your Evasion equal to your tier until your next rest."
+      }
+     }
+    ]
+   }
+  ]
+ }
+]

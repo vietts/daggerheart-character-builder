@@ -316,7 +316,7 @@ h1, h2, h3, .btn-primary, .btn-ghost, .btn-small, .top-nav a {
 /* ---------- Nav condivisa (wizard, characters) ---------- */
 
 .top-nav { display: flex; gap: 0.5rem; }
-.top-nav a {
+.top-nav a, .top-nav-button {
   color: var(--text-dim);
   text-decoration: none;
   font-size: 0.8rem;
@@ -327,7 +327,19 @@ h1, h2, h3, .btn-primary, .btn-ghost, .btn-small, .top-nav a {
   border-radius: 6px;
   border: 1px solid transparent;
 }
-.top-nav a:hover { color: var(--accent-bright); border-color: var(--border-warm); background: rgba(217, 164, 65, 0.06); }
+.top-nav-button { background: none; cursor: pointer; font-family: var(--font-display); }
+.top-nav a:hover, .top-nav-button:hover { color: var(--accent-bright); border-color: var(--border-warm); background: rgba(217, 164, 65, 0.06); }
+
+/* The Content panel, inside the shared modal. */
+.content-source { display: flex; align-items: baseline; gap: 0.6rem; padding: 0.35rem 0; }
+.content-source .hint { font-size: 0.8rem; }
+.content-warn {
+  margin: 0.25rem 0 0.5rem 1.6rem;
+  padding: 0.4rem 0.6rem;
+  border-left: 2px solid var(--accent);
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
 
 .btn-primary {
   background: linear-gradient(180deg, var(--accent-bright), var(--accent));

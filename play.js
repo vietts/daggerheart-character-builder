@@ -8,6 +8,8 @@
 // DOM and saves. The look follows the Foundryborne Daggerheart system (see play.css).
 
 import { ensureLevelFields, tierForLevel } from "./shared/advancement.js";
+import { loadContent } from "./shared/content-load.js";
+import { remapCharacterIds } from "./shared/content-ids.js";
 import { deriveSheet } from "./shared/sheet-data.js";
 import {
   CONDITIONS,
@@ -125,19 +127,11 @@ function armorShield() {
   return svg("0 0 24 26", [["M12 1 L22 4.5 V12 C22 18 17.5 22.5 12 25 C6.5 22.5 2 18 2 12 V4.5 Z"]]);
 }
 
-async function loadJson(name) {
-  const res = await fetch(`data/${name}.json`);
-  return res.json();
-}
-
-// Same files every other page loads (see sheet.js).
+// Every source, unfiltered — same reason as sheet.js: this page shows a character mid-session,
+// and what they are holding doesn't change because a picker was switched off.
 async function loadAllData() {
-  const [classes, subclasses, ancestries, communities, domainCards, weapons, armors, consumables] =
-    await Promise.all([
-      loadJson("classes"), loadJson("subclasses"), loadJson("ancestries"), loadJson("communities"),
-      loadJson("domain-cards"), loadJson("weapons"), loadJson("armors"), loadJson("consumables"),
-    ]);
-  return { classes, subclasses, ancestries, communities, domainCards, weapons, armors, consumables };
+  const { db } = await loadContent();
+  return db;
 }
 
 function loadCharacters() {
@@ -638,7 +632,9 @@ async function init() {
   const db = await loadAllData();
 
   const id = new URLSearchParams(location.search).get("id");
-  const character = loadCharacters().find((c) => c.id === id);
+  // A record's id names the edition that published it, so switching which SRD is loaded moves
+  // every id a character stores. Re-point them at what IS loaded before anything reads them.
+  const character = remapCharacterIds(loadCharacters().find((c) => c.id === id), db);
   if (!character) {
     renderNotFound(root);
     return;
