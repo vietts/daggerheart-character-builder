@@ -1,4 +1,7 @@
 import { renderCardArt, domainCardArtPath, subclassCardArtPath } from "./shared/card-render.js";
+import { loadContent } from "./shared/content-load.js";
+import { mountContentSettings } from "./shared/content-settings.js";
+import { visibleRecords } from "./shared/content-sources.js";
 import {
   ADVANCEMENT_LABELS,
   MAX_HIT_POINT_SLOTS,
@@ -61,22 +64,20 @@ let pendingSave = null; // consequences awaiting confirmation before an edit is 
 const isEditing = () => editLevel !== null;
 const workingLevel = () => (isEditing() ? editLevel : character.level + 1);
 
-async function loadJson(name) {
-  const res = await fetch(`data/${name}.json`);
-  return res.json();
-}
+// What loadContent() reported: which sources loaded, and which of them are switched off.
+let content = null;
 
 async function loadAllData() {
   // Ancestries are here for the Hit Point and Stress slots a Giant or a Human is born with:
-  // those count towards the cap of 12, so the slot gating can't be right without them.
-  const [classes, subclasses, domainCards, ancestries] = await Promise.all([
-    loadJson("classes"), loadJson("subclasses"), loadJson("domain-cards"), loadJson("ancestries"),
-  ]);
-  db.classes = classes;
-  db.subclasses = subclasses;
-  db.domainCards = domainCards;
-  db.ancestries = ancestries;
+  // those count towards the cap of 12, so the slot gating can't be right without them. Naming the
+  // four keeps this screen's fetches to the files it actually reads.
+  content = await loadContent({ files: ["classes", "subclasses", "domain-cards", "ancestries"] });
+  Object.assign(db, content.db);
 }
+
+// What the card picker may OFFER. Everything loaded stays findable by id, so a card already on
+// the sheet from a switched-off source keeps its text and its effect.
+const pickable = (list) => visibleRecords(list, content.disabled);
 
 function loadAllCharacters() {
   try {
@@ -457,7 +458,7 @@ function renderSubclassPreview(main) {
   const tile = document.createElement("div");
   tile.className = "card-tile";
   tile.appendChild(renderCardArt({
-    id: character.subclassId, name, art: subclassCardArtPath(character.subclassId, nextTier),
+    id: character.subclassId, name, art: subclassCardArtPath(sub ?? { id: character.subclassId }, nextTier),
     type: "Subclass", features: sub?.[nextTier]?.features,
   }));
   preview.appendChild(tile);
@@ -467,12 +468,12 @@ function renderSubclassPreview(main) {
 // ---------- domain cards ----------
 
 function cardModel(c) {
-  return { id: c.id, name: c.name["en-US"], art: domainCardArtPath(c.id), level: c.level, type: c.type, features: c.features };
+  return { id: c.id, name: c.name["en-US"], art: domainCardArtPath(c), level: c.level, type: c.type, features: c.features };
 }
 
 function eligibleDomainCards(cls, maxLevel, excludeIds) {
   if (!cls) return [];
-  return db.domainCards.filter((c) => c.level <= maxLevel && cls.domains.includes(c.domain) && !excludeIds.includes(c.id));
+  return pickable(db.domainCards).filter((c) => c.level <= maxLevel && cls.domains.includes(c.domain) && !excludeIds.includes(c.id));
 }
 
 // Every card already owned, plus every card being taken elsewhere on this screen.
@@ -617,7 +618,7 @@ function cardsBeingTaken() {
 
 function renderCardChoices(main, newLevel) {
   const pending = cardsBeingTaken()
-    .map((id) => ({ id, choice: choiceFor(id) }))
+    .map((id) => ({ id, choice: choiceFor(id, db) }))
     .filter((x) => x.choice);
   if (pending.length === 0) return;
 
@@ -858,6 +859,7 @@ function loadPicksFrom(entry) {
 
 async function init() {
   await loadAllData();
+  mountContentSettings(content);
   const params = new URLSearchParams(location.search);
   const id = params.get("id");
   const found = loadAllCharacters().find((c) => c.id === id);

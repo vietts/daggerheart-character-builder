@@ -6,7 +6,7 @@ MIT (see `LICENSE`).
 
 ## Game data
 
-The JSON files in `data/` carry SRD content, used under the Darrington Press Community
+The JSON files in `data/srd/` carry SRD content, used under the Darrington Press Community
 Gaming License:
 
 > This product includes materials from the Daggerheart System Reference Document 1.0,
@@ -22,7 +22,7 @@ is merged into a single `classFeatures` entry, described under "Data source" in 
 ## Prohibited Content
 
 Artwork, illustrations, imagery and logos are Prohibited Content under the DPCGL and are
-**never** committed to this repository. `data/card-art/` is git-ignored and the card renderer
+**never** committed to this repository. `data/*/card-art/` is git-ignored and the card renderer
 degrades to a CSS-only fallback without it. The fonts in `assets/fonts/` are not Daggerheart
 material: they are Cinzel, Cinzel Decorative, Montserrat and Overpass, under the SIL Open
 Font License.

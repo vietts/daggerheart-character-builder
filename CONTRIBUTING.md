@@ -75,13 +75,17 @@ Other things the code already does, worth keeping:
 
 ## Game data and art
 
-`data/*.json` is the Daggerheart SRD under the DPCGL — see [`NOTICE.md`](NOTICE.md). It is a
+`data/srd/*.json` is the Daggerheart SRD under the DPCGL — see [`NOTICE.md`](NOTICE.md). It is a
 re-export of [`daggersearch/daggerheart-data`](https://github.com/daggersearch/daggerheart-data),
 so **fix data upstream, not here**, unless the change is one of the deliberate divergences the
 README's "Data source" section lists.
 
+That keeps `data/srd/` a clean re-export. Content that isn't the SRD — homebrew, playtest material,
+a revised card — belongs in a source folder of its own beside it rather than appended to these
+files; see [`docs/adding-content.md`](docs/adding-content.md).
+
 **Card artwork, illustrations and logos are Prohibited Content under the DPCGL and never go in
-this repository.** `data/card-art/` is git-ignored and the renderer falls back to a CSS-only
+this repository.** `data/*/card-art/` is git-ignored, for every source, and the renderer falls back to a CSS-only
 card without it. A pull request carrying art can't be merged, whatever else is in it.
 
 ## Pull requests

@@ -1,3 +1,16 @@
-data/card-art/
 .DS_Store
 node_modules/
+
+# Card artwork, for every content source. These are whole card faces lifted from the PDF:
+# Prohibited Content under the DPCGL, and a pull request carrying art can't be merged whatever
+# else is in it (CONTRIBUTING.md). The renderer falls back to a CSS-only card without them.
+#
+# Art now lives beside the content it belongs to — data/<source>/card-art/ — so one rule per
+# source folder would be a rule to forget the day someone adds their own. `data/*/card-art/`
+# covers every folder that exists and every folder that will. The old flat path is kept because
+# a checkout from before the move still has one.
+data/card-art/
+data/*/card-art/
+
+# Your own source list, naming folders nobody else has. data/sources.json is the tracked one.
+data/sources.local.json

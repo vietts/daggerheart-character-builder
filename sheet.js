@@ -3,6 +3,7 @@
 // this file only builds DOM.
 
 import { ensureLevelFields } from "./shared/advancement.js";
+import { loadContent } from "./shared/content-load.js";
 import { deriveSheet } from "./shared/sheet-data.js";
 
 const CHAR_STORAGE_KEY = "dh-characters-v1";
@@ -14,20 +15,12 @@ function el(tag, className, text) {
   return node;
 }
 
-async function loadJson(name) {
-  const res = await fetch(`data/${name}.json`);
-  return res.json();
-}
-
-// Same eight files every other page loads (see create.js/level-up.js/characters.js's
-// loadAllData()); deriveSheet() only reads what it needs from this object and returns
-// null for anything it can't find, so there's no harm in always loading the full set.
+// Every source, unfiltered and unswitchable. This page has no top bar and no Content button,
+// which is correct: it prints what the character IS, so a source switched off for the pickers
+// must still resolve here or the sheet would print gaps for content the character really has.
 async function loadAllData() {
-  const [classes, subclasses, ancestries, communities, domainCards, weapons, armors, consumables] = await Promise.all([
-    loadJson("classes"), loadJson("subclasses"), loadJson("ancestries"), loadJson("communities"),
-    loadJson("domain-cards"), loadJson("weapons"), loadJson("armors"), loadJson("consumables"),
-  ]);
-  return { classes, subclasses, ancestries, communities, domainCards, weapons, armors, consumables };
+  const { db } = await loadContent();
+  return db;
 }
 
 // Read-only: getItem only, never setItem. ensureLevelFields() backfills the fields

@@ -1291,7 +1291,7 @@ group("Every id in effects.js still exists in data/");
 {
   // The one group that reads data/ for real. An upstream refresh that renames an id would
   // otherwise drop an effect silently: no error, just a number that quietly stops being right.
-  const load = async (name) => (await fetch(`../data/${name}.json${RUN}`)).json();
+  const load = async (name) => (await fetch(`../data/srd/${name}.json${RUN}`)).json();
   const [ancestries, subclasses, armors, weapons, cards, classes] = await Promise.all(
     ["ancestries", "subclasses", "armors", "weapons", "domain-cards", "classes"].map(load));
 
@@ -1822,7 +1822,7 @@ group("JSON transfer: merging an import into the saved list, by id");
 
 group("Hope & Fear (the_void release of daggerheart-data) is in data/");
 {
-  const load = async (name) => (await fetch(`../data/${name}.json${RUN}`)).json();
+  const load = async (name) => (await fetch(`../data/srd/${name}.json${RUN}`)).json();
   const [classes, subclasses, ancestries, communities, cards] = await Promise.all(
     ["classes", "subclasses", "ancestries", "communities", "domain-cards"].map(load));
   const voidClasses = classes.filter((c) => c.id.startsWith("the_void_class_"));
@@ -2062,7 +2062,7 @@ group("Every class carries what the detail card shows");
   // The card is page code this suite can't render, but it reads eight fields straight out of
   // classes.json — most of which nothing else in the app has ever touched. Renamed or dropped
   // upstream, they'd surface as a blank section rather than as an error.
-  const classes = await (await fetch(`../data/classes.json${RUN}`)).json();
+  const classes = await (await fetch(`../data/srd/classes.json${RUN}`)).json();
   const text = (loc) => typeof loc?.["en-US"] === "string" && loc["en-US"] !== "";
   const body = (desc) => Array.isArray(desc) && desc.length > 0 &&
     desc.every((d) => text(d.paragraph) || (Array.isArray(d.list) && d.list.every(text)));
@@ -2157,11 +2157,16 @@ group("Downtime: the two moves a rest gives you (SRD p. 105)");
 group("card art paths use the configured extension");
 {
   eq("CARD_ART_EXT", CARD_ART_EXT, "png");
-  eq("domainCardArtPath", domainCardArtPath("core_x"), `data/card-art/domain/core_x.${CARD_ART_EXT}`);
-  eq("subclassCardArtPath", subclassCardArtPath("core_y", "foundation"),
-    `data/card-art/subclass/core_y-foundation.${CARD_ART_EXT}`);
-  eq("ancestryCardArtPath", ancestryCardArtPath("core_z"), `data/card-art/ancestry/core_z.${CARD_ART_EXT}`);
-  eq("communityCardArtPath", communityCardArtPath("core_w"), `data/card-art/community/core_w.${CARD_ART_EXT}`);
+  // Art lives with its source, so these take a record. An UNTAGGED record — every fixture in this
+  // file, and any db built by something that never saw a source — falls back to the SRD folder.
+  eq("domainCardArtPath", domainCardArtPath({ id: "core_x" }), `data/srd/card-art/domain/core_x.${CARD_ART_EXT}`);
+  eq("subclassCardArtPath", subclassCardArtPath({ id: "core_y" }, "foundation"),
+    `data/srd/card-art/subclass/core_y-foundation.${CARD_ART_EXT}`);
+  eq("ancestryCardArtPath", ancestryCardArtPath({ id: "core_z" }), `data/srd/card-art/ancestry/core_z.${CARD_ART_EXT}`);
+  eq("communityCardArtPath", communityCardArtPath({ id: "core_w" }), `data/srd/card-art/community/core_w.${CARD_ART_EXT}`);
+  eq("a record from another source keeps its own art",
+    domainCardArtPath({ id: "hb_x", contentSource: "my-homebrew" }),
+    `data/my-homebrew/card-art/domain/hb_x.${CARD_ART_EXT}`);
 }
 
 group("Every choice in the wizard can be reached from the keyboard");
@@ -2199,6 +2204,254 @@ group("Every choice in the wizard can be reached from the keyboard");
   eq("a stale index falls back to the first", tabStopIndex(99, 13), 0);
 
   check("Space and Enter both choose", CHOOSE_KEYS.includes(" ") && CHOOSE_KEYS.includes("Enter"));
+}
+
+// ---------- content sources ----------
+
+const {
+  combineManifests,
+  mergeSources,
+  normalizeRecord,
+  parseManifest,
+  parseSourceInfo,
+  readsLocalManifest,
+  unresolvedReferences,
+  validateEffectEntry,
+  validateRecord,
+  visibleRecords,
+} = await import(`../shared/content-sources.js${RUN}`);
+
+const srcClass = (id, name, extra = {}) => ({ id, name, domains: ["BLADE"], ...extra });
+const srcCard = (id, name, extra = {}) => ({ id, name: { "en-US": name }, domain: "BLADE", level: 1, ...extra });
+const source = (name, records, effects) => ({ name, label: name, records, effects });
+
+group("The list of content folders survives a bad manifest");
+{
+  eq("a plain list is read as written", parseManifest('["srd","homebrew"]'), ["srd", "homebrew"]);
+  eq("junk names nothing rather than throwing", parseManifest("{oh no"), []);
+  eq("a JSON object isn't a list of folders", parseManifest('{"srd":true}'), []);
+  // The name goes straight into a fetch URL, so anything that could climb out of data/ is dropped.
+  eq("a name that could escape data/ is dropped", parseManifest('["srd","../../etc","a/b"]'), ["srd"]);
+  eq("the tracked list comes first, and repeats don't move it",
+    combineManifests(["srd"], ["homebrew", "srd"]), ["srd", "homebrew"]);
+
+  // The manifest may carry a flag as well as a list, and both shapes name the same folders.
+  eq("the object shape names the same folders", parseManifest('{"sources":["srd"],"local":true}'), ["srd"]);
+  eq("an object with no sources list names nothing", parseManifest('{"local":true}'), []);
+  // Opt-in, so a clean checkout never fetches a gitignored file that almost nobody has.
+  eq("a plain list does NOT ask for the local one", readsLocalManifest('["srd"]'), false);
+  eq("the flag is what asks for it", readsLocalManifest('{"sources":["srd"],"local":true}'), true);
+  eq("and it has to actually say true", readsLocalManifest('{"sources":["srd"],"local":"yes"}'), false);
+  eq("junk asks for nothing", readsLocalManifest("{oh no"), false);
+
+  const info = parseSourceInfo('{"label":"My Homebrew","files":["domain-cards","effects","nope"]}', "my-homebrew");
+  eq("a source says what it holds", info.files, ["domain-cards", "effects"]);
+  eq("and what to call it", info.label, "My Homebrew");
+  eq("a folder with no label is called after itself", parseSourceInfo('{"files":[]}', "homebrew").label, "homebrew");
+  eq("an unusable source.json is skipped, not guessed at", parseSourceInfo("{", "my-homebrew"), null);
+}
+
+group("A class written in the shape of its neighbours still works");
+{
+  // classes.json is the one file whose name is a bare uppercase string, because that name is a
+  // relational key: subclasses[].class holds "BARD" and create.js joins on it. Writing a class the
+  // way every other file is written is therefore the most natural homebrew mistake there is.
+  eq("a localized class name becomes the key it has to be",
+    normalizeRecord("classes", { id: "c", name: { "en-US": "Witch" } }).name, "WITCH");
+  eq("a bare one is left as the key it already is",
+    normalizeRecord("classes", { id: "c", name: "WITCH" }).name, "WITCH");
+  eq("and a card written bare gets the localized shape its readers expect",
+    normalizeRecord("domain-cards", { id: "x", name: "Ironhide" }).name, { "en-US": "Ironhide" });
+  eq("normalizing never touches the record it was given",
+    (() => { const r = { id: "c", name: "WITCH" }; normalizeRecord("classes", r); return r.name; })(), "WITCH");
+}
+
+group("A record that would kill a screen never reaches db");
+{
+  eq("a class with no domains is refused", validateRecord("classes", { id: "c", name: "WITCH" }), "missing: domains");
+  eq("a card with no domain is refused", validateRecord("domain-cards", { id: "x", name: { "en-US": "A" } }), "missing: domain");
+  eq("a record with no id is refused", validateRecord("domain-cards", { name: { "en-US": "A" } }), "missing: id");
+  eq("a subclass that names no class is refused, because nothing could ever show it",
+    validateRecord("subclasses", { id: "s", name: { "en-US": "A" } }), "missing: class (the class name, uppercase)");
+  // A source may bring a domain of its own. Rejecting one nobody has heard of would block the
+  // case this whole feature exists to be ready for.
+  eq("a domain nobody has heard of is not an error",
+    validateRecord("domain-cards", srcCard("x", "A", { domain: "DREAD" })), null);
+
+  const { db, report } = mergeSources([source("homebrew", { classes: [srcClass("hb_a", "WITCH"), { id: "hb_b", name: "SEER" }] })]);
+  eq("the usable record still lands", db.classes.map((c) => c.id), ["hb_a"]);
+  eq("and the panel can say which one didn't, and why",
+    report.sources[0].skipped, [{ file: "classes", id: "hb_b", reason: "missing: domains" }]);
+}
+
+group("A later source revises what an earlier one said");
+{
+  const { db, report } = mergeSources([
+    source("srd", { "domain-cards": [srcCard("core_a", "Untouchable"), srcCard("core_b", "Whirlwind")] }),
+    source("homebrew", { "domain-cards": [srcCard("core_a", "Untouchable (revised)")] }),
+  ]);
+  const visible = (dis) => visibleRecords(db.domainCards, dis).map((c) => c.name["en-US"]);
+  eq("the revision wins", visible(new Set()), ["Untouchable (revised)", "Whirlwind"]);
+  eq("in the position the original held", db.domainCards[0].id, "core_a");
+  eq("and every visible record knows where it came from",
+    visibleRecords(db.domainCards, new Set()).map((c) => c.contentSource), ["homebrew", "srd"]);
+  eq("the panel reports it, so an accidental duplicate is visible",
+    report.collisions, [{ file: "domain-cards", id: "core_a", from: "homebrew", over: "srd", byName: false }]);
+
+  // The record that lost is KEPT, not dropped — switching the source that beat it off has to give
+  // it back, or a folder that reprints a lot would empty the pickers the moment it went away.
+  eq("the superseded record is still in the db, marked with what took it",
+    db.domainCards.filter((c) => c.supersededBy).map((c) => [c.id, c.contentSource, c.supersededBy]),
+    [["core_a", "srd", "core_a"]]);
+  eq("switch the reviser off and the original is offered again",
+    visible(new Set(["homebrew"])), ["Whirlwind", "Untouchable"]);
+  eq("switch both off and nothing is offered", visible(new Set(["homebrew", "srd"])), []);
+
+  // A class's real key is its uppercase name, not its id: create.js joins subclasses on it. Two
+  // Bards under different ids would put two identical tiles in the picker with every Bard
+  // subclass appearing under both.
+  const byName = mergeSources([
+    source("srd", { classes: [srcClass("core_class_bard", "BARD")] }),
+    source("homebrew", { classes: [srcClass("homebrew_class_bard", "BARD")] }),
+  ]);
+  eq("a class with the same name collapses even under a new id",
+    visibleRecords(byName.db.classes, new Set()).length, 1);
+  eq("the later one being the survivor", byName.db.classes[0].id, "homebrew_class_bard");
+  eq("and the shadowed one comes back if the homebrew is switched off",
+    visibleRecords(byName.db.classes, new Set(["homebrew"])).map((c) => c.id), ["core_class_bard"]);
+  eq("and it's reported as the name clash it is", byName.report.collisions[0].byName, true);
+}
+
+group("What the panel says about records one source took over from another");
+{
+  const { takeoverSummary } = await import(`../shared/content-settings.js${RUN}`);
+  const src = (name, label, counts) => ({ name, label, counts, skipped: [] });
+  const hit = (from, over, id, file = "domain-cards") => ({ file, id, from, over, byName: false });
+
+  // A pair that collides a little is worth reading record by record: that is a homebrew folder
+  // quietly sitting on top of something, which is the whole reason this list exists.
+  const small = {
+    sources: [src("srd", "Daggerheart SRD", { domainCards: 210 }), src("mine", "My homebrew", { domainCards: 3 })],
+    collisions: [hit("mine", "srd", "a"), hit("mine", "srd", "b")],
+  };
+  eq("a small takeover is listed record by record", takeoverSummary(small, new Set()).lines.length, 2);
+  check("and it lights the nav badge", takeoverSummary(small, new Set()).unexpected === 2);
+
+  // A pair that collides wholesale is one fact repeated, and it buries the homebrew line above.
+  const big = {
+    sources: [src("srd", "Daggerheart SRD", { domainCards: 189 }), src("revised", "Revised", { domainCards: 210 })],
+    collisions: Array.from({ length: 189 }, (_, i) => hit("revised", "srd", `c${i}`)),
+  };
+  eq("a wholesale takeover collapses to one line", takeoverSummary(big, new Set()).lines,
+    ["Revised supersedes every record Daggerheart SRD has (189)"]);
+  check("and it does NOT light the nav badge, because it is what anyone would expect",
+    takeoverSummary(big, new Set()).unexpected === 0);
+
+  // With the later source switched off the takeover never happened, so saying it did sends a
+  // player looking for a change that isn't in front of them.
+  eq("nothing is claimed when the source that would take over is switched off",
+    takeoverSummary(big, new Set(["revised"])).lines, []);
+  eq("nor when the source being taken over from is switched off",
+    takeoverSummary(big, new Set(["srd"])).lines, []);
+
+  // Partial, because the reviser didn't reprint everything — so the count says something.
+  const partial = {
+    sources: [src("srd", "Daggerheart SRD", { weapons: 20 }), src("revised", "Revised", { weapons: 15 })],
+    collisions: Array.from({ length: 15 }, (_, i) => hit("revised", "srd", `w${i}`, "weapons")),
+  };
+  eq("a partial takeover says how many, so the survivors are implied",
+    takeoverSummary(partial, new Set()).lines, ["Revised supersedes 15 of Daggerheart SRD's records"]);
+}
+
+group("What a source may say its content does");
+{
+  eq("flat numbers are the ordinary case", validateEffectEntry({ evasion: 1 }), null);
+  eq("so is a permanent bonus, which is what keeps a vaulted card applying",
+    validateEffectEntry({ armorScore: 1, permanent: true }), null);
+  eq("and a whole choice, which needs no page code at all", validateEffectEntry({
+    choice: { prompt: "Pick two", kind: "benefit", pick: 2, options: [{ id: "a", label: "A", stressSlots: 1 }] },
+  }), null);
+  eq("an entry may name the feature it encodes, for the \"?\" breakdown",
+    validateEffectEntry({ evasion: 1, feature: "Unwavering" }), null);
+  eq("and say which benefit of a card it deliberately skipped",
+    validateEffectEntry({ evasion: 1, excluded: ["costs a Stress"] }), null);
+  check("a stat that isn't a number is refused",
+    validateEffectEntry({ evasion: "lots" }) !== null);
+  check("a stat this app doesn't compute is refused",
+    validateEffectEntry({ luck: 1 }) !== null);
+  // effect-choice.js renders anything that isn't "benefit" as an Experience picker rather than
+  // failing, so an unrecognised kind would silently ask the wrong question.
+  check("a choice of an unknown kind is refused rather than rendered as the wrong picker",
+    validateEffectEntry({ choice: { prompt: "?", kind: "vibes", options: [{ id: "a", label: "A" }] } }) !== null);
+  check("`when` is refused, because JSON can't carry the function it needs",
+    validateEffectEntry({ evasion: 1, when: true }) !== null);
+  // The whitelist is no wider than what shared/effects.js understands: a key with no code behind
+  // it would validate, ship, and quietly do nothing.
+  check("a mechanic this app hasn't got yet is refused rather than silently ignored",
+    validateEffectEntry({ evasion: 1, unarmedProfile: {} }) !== null);
+}
+
+group("A source's effects overlay the built-in table without replacing it");
+{
+  const { effects } = mergeSources([
+    source("srd", {}, { "core_card_a": { evasion: 1 } }),
+    source("homebrew", {}, { "core_card_a": { evasion: 3 }, "hb_card_b": { armorScore: 2 } }),
+  ]);
+  eq("a later source revises what a card does", effects["core_card_a"], { evasion: 3 });
+  eq("and may declare one of its own", effects["hb_card_b"], { armorScore: 2 });
+
+  const bad = mergeSources([source("homebrew", {}, { "hb_x": { evasion: 1, when: true } })]);
+  eq("an entry the app can't use is dropped, not applied", bad.effects["hb_x"], undefined);
+  eq("and the panel says which one, and why", bad.report.effectIssues.length, 1);
+}
+
+group("Switching a source off changes the pickers and nothing else");
+{
+  const { db } = mergeSources([
+    source("srd", { "domain-cards": [srcCard("core_a", "A")] }),
+    source("homebrew", { "domain-cards": [srcCard("homebrew_a", "B")] }),
+  ]);
+  eq("with nothing switched off, everything is offered",
+    visibleRecords(db.domainCards, new Set()).map((c) => c.id), ["core_a", "homebrew_a"]);
+  eq("a switched-off source leaves the pickers",
+    visibleRecords(db.domainCards, new Set(["homebrew"])).map((c) => c.id), ["core_a"]);
+  eq("the srd is a source like any other and can go too",
+    visibleRecords(db.domainCards, new Set(["srd", "homebrew"])).map((c) => c.id), []);
+  // Every fixture in this file, and every db built by something that predates content sources,
+  // is untagged. Dropping those would break far more than it protected.
+  eq("a record with no source is always offered",
+    visibleRecords([{ id: "plain" }], new Set(["homebrew"])).map((c) => c.id), ["plain"]);
+  // The point of the split: the record is still THERE, so a character built on it still resolves.
+  eq("but the record is still findable by id, which is what keeps a character whole",
+    db.domainCards.some((c) => c.id === "homebrew_a"), true);
+}
+
+group("A character says so when it refers to content this browser hasn't got");
+{
+  const db = {
+    classes: [{ id: "core_class_bard" }],
+    subclasses: [{ id: "core_subclass_troubadour" }],
+    ancestries: [{ id: "core_ancestry_human" }],
+    communities: [{ id: "core_community_loreborne" }],
+    weapons: [{ id: "core_weapon_shortsword" }],
+    armors: [{ id: "core_armor_leather" }],
+    domainCards: [{ id: "core_card_a" }],
+  };
+  const whole = {
+    classId: "core_class_bard", subclassId: "core_subclass_troubadour",
+    heritage: { communityId: "core_community_loreborne", ancestryIds: ["core_ancestry_human"] },
+    equipment: { primaryWeaponId: "core_weapon_shortsword", armorId: "core_armor_leather" },
+    creationDomainCardIds: ["core_card_a"],
+  };
+  eq("a character whose content is all here says nothing", unresolvedReferences(whole, db), []);
+
+  const orphan = { ...whole, classId: "myhomebrew_class_witch", equipment: { armorId: "hb_armor_ironhide" } };
+  eq("one built on a folder you no longer have names what's missing",
+    unresolvedReferences(orphan, db), [{ kind: "class", id: "myhomebrew_class_witch" }, { kind: "armor", id: "hb_armor_ironhide" }]);
+  // Unarmed and Unarmored are stored values with no record behind them. Reporting those as
+  // missing content would put a warning on the sheet of every barehanded character.
+  eq("a sentinel is not missing content",
+    unresolvedReferences({ equipment: { primaryWeaponId: "UNARMED" } }, db, { sentinels: ["UNARMED"] }), []);
 }
 
 // ---------- report ----------

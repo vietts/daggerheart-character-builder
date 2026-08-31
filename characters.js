@@ -30,6 +30,9 @@ import { UNARMED_PROFILE, derivedStats } from "./shared/derived-stats.js";
 import { statLine } from "./shared/stat-line.js";
 import { ignoresBurden, unresolvedChoices } from "./shared/effects.js";
 import { UNARMED, UNARMORED, armorStats, burdenWarning, featureLine, weaponStats } from "./shared/gear.js";
+import { loadContent } from "./shared/content-load.js";
+import { mountContentSettings } from "./shared/content-settings.js";
+import { unresolvedReferences } from "./shared/content-sources.js";
 import { escapeHtml } from "./shared/escape.js";
 import { exportFileName, importConflicts, mergeImported, parseImport, serializeCharacters } from "./shared/transfer.js";
 
@@ -51,25 +54,17 @@ function titleCase(str) {
   return str.charAt(0) + str.slice(1).toLowerCase();
 }
 
-async function loadJson(name) {
-  const res = await fetch(`data/${name}.json`);
-  return res.json();
-}
+// What loadContent() reported: which sources loaded, and which of them are switched off.
+let content = null;
 
 async function loadAllData() {
-  const [classes, subclasses, ancestries, communities, domainCards, weapons, armors, consumables] = await Promise.all([
-    loadJson("classes"), loadJson("subclasses"), loadJson("ancestries"), loadJson("communities"),
-    loadJson("domain-cards"), loadJson("weapons"), loadJson("armors"), loadJson("consumables"),
-  ]);
-  db.classes = classes;
-  db.subclasses = subclasses;
-  db.ancestries = ancestries;
-  db.communities = communities;
-  db.domainCards = domainCards;
-  db.weapons = weapons;
-  db.armors = armors;
-  db.consumables = consumables;
+  content = await loadContent();
+  Object.assign(db, content.db);
 }
+
+// Ids a character stores that this browser can't resolve. Sentinels are stored values with no
+// record behind them, so they aren't missing content.
+const missingContent = (ch) => unresolvedReferences(ch, db, { sentinels: [UNARMED, UNARMORED] });
 
 function loadCharacters() {
   try {
@@ -487,6 +482,19 @@ function renderDetail() {
   closeBtn.addEventListener("click", () => { openId = null; renderAll(); });
   container.appendChild(closeBtn);
 
+  // The app is deliberately quiet about data it can't find — derivedStats() returns null rather
+  // than throwing — so without this a character built on a source folder that has since been
+  // renamed prints a sheet headed "Class" with quietly wrong numbers and nothing to explain it.
+  const missing = missingContent(ch);
+  if (missing.length > 0) {
+    const banner = document.createElement("p");
+    banner.className = "warn-banner";
+    const kinds = [...new Set(missing.map((m) => m.kind))].join(", ");
+    banner.textContent = `⚠ ${missing.length} reference${missing.length === 1 ? "" : "s"} not in your content ` +
+      `(${kinds}). A source folder this character was built with may be switched off, renamed or missing.`;
+    container.appendChild(banner);
+  }
+
   const cls = findClass(ch.classId);
   const sub = findSubclass(ch.subclassId);
 
@@ -585,14 +593,14 @@ function renderDetail() {
   // on the earlier cards are still in play.
   if (sub) {
     for (const tier of subclassTiersUpTo(ch.subclassTier)) {
-      cardsRow.appendChild(cardBlock({ id: sub.id, name: `${sub.name["en-US"]} (${SUBCLASS_TIER_LABELS[tier]})`, art: subclassCardArtPath(sub.id, tier), type: "Subclass", features: sub[tier]?.features }));
+      cardsRow.appendChild(cardBlock({ id: sub.id, name: `${sub.name["en-US"]} (${SUBCLASS_TIER_LABELS[tier]})`, art: subclassCardArtPath(sub, tier), type: "Subclass", features: sub[tier]?.features }));
     }
   }
   const com = findCommunity(ch.heritage.communityId);
-  if (com) cardsRow.appendChild(cardBlock({ id: com.id, name: com.name["en-US"], art: communityCardArtPath(com.id), type: "Community", features: com.features }, `Community: ${com.name["en-US"]}`));
+  if (com) cardsRow.appendChild(cardBlock({ id: com.id, name: com.name["en-US"], art: communityCardArtPath(com), type: "Community", features: com.features }, `Community: ${com.name["en-US"]}`));
   for (const ancId of ch.heritage.ancestryIds) {
     const anc = findAncestry(ancId);
-    if (anc) cardsRow.appendChild(cardBlock({ id: anc.id, name: anc.name["en-US"], art: ancestryCardArtPath(anc.id), type: "Ancestry", features: anc.features }, `Ancestry: ${anc.name["en-US"]}`));
+    if (anc) cardsRow.appendChild(cardBlock({ id: anc.id, name: anc.name["en-US"], art: ancestryCardArtPath(anc), type: "Ancestry", features: anc.features }, `Ancestry: ${anc.name["en-US"]}`));
   }
   container.appendChild(cardsRow);
 
@@ -667,7 +675,7 @@ function renderDetail() {
       const inVault = ch.domainVaultIds.includes(cardId);
       const wrap = document.createElement("div");
       wrap.className = "card-tile";
-      wrap.appendChild(renderCardArt({ id: dc.id, name: dc.name["en-US"], art: domainCardArtPath(dc.id), level: dc.level, type: dc.type, features: dc.features }));
+      wrap.appendChild(renderCardArt({ id: dc.id, name: dc.name["en-US"], art: domainCardArtPath(dc), level: dc.level, type: dc.type, features: dc.features }));
       const label = document.createElement("div");
       label.className = "card-tile-label";
       label.textContent = dc.name["en-US"];
@@ -1067,6 +1075,7 @@ async function usePortraitFile(file) {
 
 async function init() {
   await loadAllData();
+  mountContentSettings(content);
   loadCharacters();
   // Returning from a level edit reopens the character with the history showing, so any
   // level the edit knocked out of shape is in front of you rather than a click away.

@@ -340,11 +340,26 @@ export const EFFECT_STAT_KEYS = [
   "armorScore", "attack", "spellcast", "extraDomainCards",
 ];
 
-function lookup(...keys) {
+// A content source may declare its own effects, and they arrive on `db.effects` — never merged
+// into EFFECTS above, which stays exactly the hand-audited catalogue this file documents.
+//
+// A source's entry WINS over one here, because a source that revises a record is revising what
+// that record does: a reprint of a card is the new version of it. An override that declares
+// nothing INHERITS the entry here — including the functions and choices JSON can't express — and
+// the "?" breakdown labels it with the overriding record's own name, so the attribution stays
+// honest either way.
+function lookup(db, ...keys) {
+  const source = db?.effects;
   for (const key of keys) {
+    if (source && Object.prototype.hasOwnProperty.call(source, key)) return { key, effect: source[key] };
     if (Object.prototype.hasOwnProperty.call(EFFECTS, key)) return { key, effect: EFFECTS[key] };
   }
   return null;
+}
+
+/** The effect behind a key, source overlay included. For the two places that read one directly. */
+export function effectFor(db, ...keys) {
+  return lookup(db, ...keys)?.effect || null;
 }
 
 function featureNames(entity) {
@@ -386,14 +401,14 @@ export function collectEffects(ch, db) {
 
   for (const chosen of ch.heritage?.chosenFeatures || []) {
     const anc = (db?.ancestries || []).find((a) => a.id === chosen.ancestryId);
-    add(lookup(`${chosen.ancestryId}:${chosen.featureName}`), "ancestry",
+    add(lookup(db, `${chosen.ancestryId}:${chosen.featureName}`), "ancestry",
       `${displayName(anc, "Ancestry")} — ${chosen.featureName}`);
   }
 
   const sub = (db?.subclasses || []).find((s) => s.id === ch.subclassId);
   if (sub) {
     for (const tier of tiersUpTo(ch.subclassTier)) {
-      const hit = lookup(`${sub.id}:${tier}`);
+      const hit = lookup(db, `${sub.id}:${tier}`);
       // The feature name comes from the entry, not from data/: a tier can hold two features
       // and only one of them is the one being encoded (Stalwart's Foundation is Unwavering
       // AND Iron Will; only Unwavering moves a stat).
@@ -407,7 +422,7 @@ export function collectEffects(ch, db) {
     ? undefined
     : (db?.armors || []).find((a) => a.id === ch.equipment?.armorId);
   for (const name of featureNames(armor)) {
-    add(lookup(`${armor.id}:${name}`, `armor:${name}`), "armor", `${displayName(armor, "Armor")} (${name})`);
+    add(lookup(db, `${armor.id}:${name}`, `armor:${name}`), "armor", `${displayName(armor, "Armor")} (${name})`);
   }
 
   // Both slots, always: what's equipped is what applies. See derived-stats.js for why the old
@@ -421,7 +436,7 @@ export function collectEffects(ch, db) {
   for (const [scope, weaponId] of weaponSlots) {
     const weapon = (db?.weapons || []).find((w) => w.id === weaponId);
     for (const name of featureNames(weapon)) {
-      add(lookup(`${weapon.id}:${name}`, `weapon:${name}`), "weapon", `${displayName(weapon, "Weapon")} (${name})`, scope);
+      add(lookup(db, `${weapon.id}:${name}`, `weapon:${name}`), "weapon", `${displayName(weapon, "Weapon")} (${name})`, scope);
     }
   }
 
@@ -429,7 +444,7 @@ export function collectEffects(ch, db) {
   // permanent keeps applying from the vault, which is where those cards tell you to put them.
   const vaulted = ch.domainVaultIds || [];
   for (const cardId of ch.domainCardIds || []) {
-    const hit = lookup(cardId);
+    const hit = lookup(db, cardId);
     if (!hit) continue;
     if (vaulted.includes(cardId) && !hit.effect.permanent) continue;
     const card = (db?.domainCards || []).find((c) => c.id === cardId);
@@ -440,8 +455,8 @@ export function collectEffects(ch, db) {
 }
 
 /** The choice a source asks for, if it asks for one at all. */
-export function choiceFor(key) {
-  return EFFECTS[key]?.choice || null;
+export function choiceFor(key, db) {
+  return effectFor(db, key)?.choice || null;
 }
 
 // How many of each domain are in the loadout — the requirement the *-Touched cards check.

@@ -4,11 +4,13 @@
 //
 // This public release does not ship card-art images (see README: it's proprietary
 // Darrington Press art, not covered by the DPCGL). Every card gracefully falls back
-// to the CSS-only rendering below unless you supply your own data/card-art/ folder.
+// to the CSS-only rendering below unless you supply your own art. Each content source keeps its
+// own art, at data/<source>/card-art/, so a revised card shows its own face rather than the SRD's.
 
 import { openLightbox } from "./lightbox.js";
 import { escapeHtml } from "./escape.js";
 import { CARD_ART_EXT } from "./card-art-config.js";
+import { SRD_SOURCE } from "./content-sources.js";
 
 /**
  * @param {{ art: string, domainClass?: string, level?: number|string, type?: string, name: string, features?: Array<{name: {"en-US": string}, description: Array<{paragraph: {"en-US": string}}>}> }} card
@@ -107,15 +109,27 @@ export function descriptionHtml(description) {
     .join("");
 }
 
-export function domainCardArtPath(id) {
-  return `data/card-art/domain/${id}.${CARD_ART_EXT}`;
+// Art lives with the content it belongs to: data/<source>/card-art/. These take the RECORD rather
+// than its id, because the id alone can't say which folder to look in.
+//
+// There is deliberately no fallback to the SRD's art when a source ships none. These files are
+// whole card faces lifted from the PDF, rules text included — so showing the SRD image for a
+// revised card would print superseded text as an unselectable picture while the app applied the
+// new record. The CSS fallback card prints the revised text instead, which is plainer and correct.
+// When you do want the old art on a reprint, copy the file into the source's folder.
+function artRoot(record) {
+  return `data/${record?.contentSource || SRD_SOURCE}/card-art`;
 }
-export function subclassCardArtPath(id, tier) {
-  return `data/card-art/subclass/${id}-${tier}.${CARD_ART_EXT}`;
+
+export function domainCardArtPath(card) {
+  return `${artRoot(card)}/domain/${card?.id}.${CARD_ART_EXT}`;
 }
-export function communityCardArtPath(id) {
-  return `data/card-art/community/${id}.${CARD_ART_EXT}`;
+export function subclassCardArtPath(subclass, tier) {
+  return `${artRoot(subclass)}/subclass/${subclass?.id}-${tier}.${CARD_ART_EXT}`;
 }
-export function ancestryCardArtPath(id) {
-  return `data/card-art/ancestry/${id}.${CARD_ART_EXT}`;
+export function communityCardArtPath(community) {
+  return `${artRoot(community)}/community/${community?.id}.${CARD_ART_EXT}`;
+}
+export function ancestryCardArtPath(ancestry) {
+  return `${artRoot(ancestry)}/ancestry/${ancestry?.id}.${CARD_ART_EXT}`;
 }
