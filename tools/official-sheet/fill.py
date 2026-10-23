@@ -298,6 +298,8 @@ def main():
                              capture_output=True, text=True)
     if derived.returncode:
         sys.exit(derived.stderr.strip())
+    if derived.stderr.strip():
+        print(derived.stderr.strip(), file=sys.stderr)
     import json
     sheets = json.loads(derived.stdout)
 

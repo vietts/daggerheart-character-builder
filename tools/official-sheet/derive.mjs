@@ -8,6 +8,7 @@
 import { readFile } from "node:fs/promises";
 import { parseImport } from "../../shared/transfer.js";
 import { deriveSheet } from "../../shared/sheet-data.js";
+import { UNARMED, UNARMORED } from "../../shared/gear.js";
 
 const root = new URL("../../data/", import.meta.url);
 const load = async (name) => JSON.parse(await readFile(new URL(`${name}.json`, root), "utf8"));
@@ -28,6 +29,33 @@ const [classes, subclasses, ancestries, communities, domainCards, weapons, armor
   ["classes", "subclasses", "ancestries", "communities", "domain-cards", "weapons", "armors", "consumables"].map(load),
 );
 const db = { classes, subclasses, ancestries, communities, domainCards, weapons, armors, consumables };
+
+// A hand-written file is the likely source of a wrong id, and deriveSheet() prints a dash for
+// anything it can't find rather than failing. Say which id it was, so the pregen doesn't reach
+// the table with an empty weapon line.
+const known = (list, id) => !id || id === UNARMED || id === UNARMORED || list.some((x) => x.id === id);
+for (const ch of characters) {
+  const checks = [
+    ["classId", classes, ch.classId], ["subclassId", subclasses, ch.subclassId],
+    ["heritage.communityId", communities, ch.heritage?.communityId],
+    ...(ch.heritage?.ancestryIds || []).map((id) => ["heritage.ancestryIds", ancestries, id]),
+    ["equipment.primaryWeaponId", weapons, ch.equipment?.primaryWeaponId],
+    ["equipment.secondaryWeaponId", weapons, ch.equipment?.secondaryWeaponId],
+    ["equipment.armorId", armors, ch.equipment?.armorId],
+    ["equipment.potionChoice", consumables, ch.equipment?.potionChoice],
+    ...(ch.domainCardIds || []).map((id) => ["domainCardIds", domainCards, id]),
+  ];
+  for (const [field, list, id] of checks) {
+    if (!known(list, id)) console.error(`${ch.name || ch.id}: unknown ${field} "${id}"`);
+  }
+  // A misspelt feature name isn't an error deriveSheet() can see: the feature just never prints.
+  for (const { ancestryId, featureName } of ch.heritage?.chosenFeatures || []) {
+    const ancestry = ancestries.find((a) => a.id === ancestryId);
+    if (ancestry && !ancestry.features.some((f) => f.name["en-US"] === featureName)) {
+      console.error(`${ch.name || ch.id}: ${ancestry.name["en-US"]} has no feature "${featureName}"`);
+    }
+  }
+}
 
 // classId travels along: the official sheets are one PDF per class, so the filler needs it
 // to pick the template, and deriveSheet() only exposes the display name. The armor's base

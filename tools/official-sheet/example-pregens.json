@@ -1,0 +1,69 @@
+{
+  "format": "dh-characters",
+  "version": 1,
+  "characters": [
+    {
+      "id": "lyra",
+      "name": "Lyra Vantis",
+      "pronouns": "she/her",
+      "level": 1,
+      "classId": "core_class_bard",
+      "subclassId": "core_subclass_troubadour",
+      "traits": { "agility": 0, "strength": -1, "finesse": 1, "instinct": 0, "presence": 2, "knowledge": 1 },
+      "heritage": {
+        "ancestryIds": ["core_ancestry_elf"],
+        "chosenFeatures": [
+          { "ancestryId": "core_ancestry_elf", "featureName": "Quick Reactions" },
+          { "ancestryId": "core_ancestry_elf", "featureName": "Celestial Trance" }
+        ],
+        "communityId": "core_community_highborne"
+      },
+      "equipment": {
+        "primaryWeaponId": "core_weapon_rapier",
+        "secondaryWeaponId": "core_weapon_small_dagger",
+        "armorId": "core_armor_gambeson_armor",
+        "potionChoice": "core_consumable_minor_health_potion"
+      },
+      "experiences": [
+        { "name": "Smuggler", "modifier": 2 },
+        { "name": "Silver Tongue", "modifier": 2 }
+      ],
+      "domainCardIds": ["core_domain_card_inspirational_words", "core_domain_card_book_of_ava"],
+      "background": { "description": "Grew up on the docks; owes a debt to a smuggler queen.", "answers": "" },
+      "connectionsNotes": ""
+    },
+    {
+      "id": "brann",
+      "name": "Brann",
+      "pronouns": "he/him",
+      "level": 3,
+      "proficiency": 2,
+      "hitPointSlotsBonus": 1,
+      "classId": "core_class_warrior",
+      "subclassId": "core_subclass_call_of_the_brave",
+      "traits": { "agility": 1, "strength": 3, "finesse": 0, "instinct": 1, "presence": 0, "knowledge": -1 },
+      "heritage": {
+        "ancestryIds": ["core_ancestry_dwarf", "core_ancestry_orc"],
+        "chosenFeatures": [
+          { "ancestryId": "core_ancestry_dwarf", "featureName": "Thick Skin" },
+          { "ancestryId": "core_ancestry_orc", "featureName": "Tusks" }
+        ],
+        "communityId": "core_community_ridgeborne"
+      },
+      "equipment": {
+        "primaryWeaponId": "core_weapon_greatsword",
+        "secondaryWeaponId": null,
+        "armorId": "core_armor_chainmail_armor",
+        "potionChoice": "core_consumable_minor_stamina_potion"
+      },
+      "experiences": [
+        { "name": "Mercenary", "modifier": 2 },
+        { "name": "Bar Brawler", "modifier": 2 },
+        { "name": "Veteran of the Siege", "modifier": 2 }
+      ],
+      "domainCardIds": ["core_domain_card_get_back_up", "core_domain_card_not_good_enough", "core_domain_card_whirlwind"],
+      "background": { "description": "", "answers": "" },
+      "connectionsNotes": ""
+    }
+  ]
+}
