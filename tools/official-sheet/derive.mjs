@@ -30,6 +30,18 @@ const [classes, subclasses, ancestries, communities, domainCards, weapons, armor
 const db = { classes, subclasses, ancestries, communities, domainCards, weapons, armors, consumables };
 
 // classId travels along: the official sheets are one PDF per class, so the filler needs it
-// to pick the template, and deriveSheet() only exposes the display name.
-const sheets = characters.map((ch) => ({ id: ch.id, classId: ch.classId, ...deriveSheet(ch, db) }));
+// to pick the template, and deriveSheet() only exposes the display name. The armor's base
+// numbers too: the official sheet has a "base thresholds / base score" slot on the armor line,
+// separate from the level-adjusted thresholds deriveSheet() reports.
+const sheets = characters.map((ch) => {
+  const armor = armors.find((a) => a.id === ch.equipment?.armorId);
+  return {
+    id: ch.id,
+    classId: ch.classId,
+    armorBase: armor
+      ? { major: armor.baseMajorThreshold, severe: armor.baseSevereThreshold, score: armor.baseScore }
+      : null,
+    ...deriveSheet(ch, db),
+  };
+});
 console.log(JSON.stringify(sheets, null, 2));
